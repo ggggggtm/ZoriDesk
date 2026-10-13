@@ -1,319 +1,89 @@
-# Loom
+# ZoriDesk
 
-**Conversation first. Governed Agent Teams when the work becomes a Mission.**
+**本地优先的多 Agent 协作与执行工作台。**
 
-Loom is a local-first macOS workspace for pairing with coding Agents and for
-governing multi-Agent work. You can begin with an ordinary conversation, then
-turn a concrete objective into a titled Mission with an explicit Team,
-independent execution bindings, live activity, evidence, accounting and human
-intervention.
+Local-first multi-agent workspace, built with Go and SwiftUI.
 
-[Changelog](./CHANGELOG.md) ·
-[Current status](./docs/CURRENT.md) ·
-[Product plan](./PRODUCT-PLAN.md) ·
-[Architecture](./docs/ARCHITECTURE.md) ·
-[Development guide](./docs/DEVELOPMENT.md)
+ZoriDesk 将 Agent 对话、任务协作、执行审批和结果追踪放在同一个桌面工作台中。面向开发者，逐步探索更清晰的运行工具接入、更可靠的任务执行和可切换的沙箱后端。
 
-> **Release candidate**
->
-> This branch prepares Loom `v0.5.3-rc.1` from the installed `0.5.3` Build 188
-> checkpoint. Phase 2D is accepted for its defined scope. The four-real-Provider
-> Team, real-account revoke/rate-limit matrix and custom-endpoint live loop are
-> explicitly deferred; see [Current status](./docs/CURRENT.md).
+> **项目状态：初始化 / 持续建设。** 本次初始化调整项目介绍与演进方向，尚未改变运行逻辑，也没有重新验证构建和端到端运行。应用名称、后台进程 `loomd`、模块路径与安装脚本暂时沿用既有实现，后续分阶段统一。
 
-## Start Here
+[改进路线](#改进路线) · [源码导航](#源码导航) · [架构文档](docs/ARCHITECTURE.md) · [开发指南](docs/DEVELOPMENT.md) · [许可证](LICENSE)
 
-Open Loom and type in **Conversation**. The App starts and manages its bundled
-`loomd` service automatically; users do not need to launch a second process.
+## 解决什么问题
 
-1. Start a conversation in the center workspace.
-2. Choose a route near the composer when you need a different Harness,
-   Provider Account, model or reasoning level.
-3. Continue chatting for ordinary pairing work.
-4. Choose **Run as Mission** when the work needs a Team, workflow, governed
-   execution or durable result.
-5. Review the proposed Team and execution bindings, then start the Mission.
-6. Follow each Agent's activity, output and status in Mission Room. If a Mission
-   is blocked, add guidance through **Continue this Mission**.
+使用多个 Agent 工具完成开发任务时，对话、执行环境、权限和结果容易分散。ZoriDesk 希望让这些环节保持可理解、可干预和可追踪：
 
-If no usable route is available, open **Runtime & Providers**. Loom separates
-runtime discovery from Provider credentials, so the screen can tell you whether
-the missing piece is a Harness, an account, a model or a credential.
+1. 在桌面端开始对话，选择运行工具和模型服务。
+2. 将明确目标组织为 Mission（任务），审核 Agent 团队与执行配置。
+3. 在受控权限下执行，查看各 Agent 的状态与输出。
+4. 检查结果与执行记录，在失败或阻塞时提供指导并继续。
 
-## The Product Model
+普通对话不会自动创建团队；模型输出是建议，不是执行授权。
 
-These five concepts are deliberately separate:
+## 已有代码基础
 
-| Concept | What the user should expect |
-|---|---|
-| **Conversation** | The default pairing surface. It can remain a simple chat and does not create a Team implicitly. |
-| **Mission** | One titled, navigable workflow related to a Conversation. Opening it shows that workflow's objective, Team, Agent activity, output, evidence and recovery state. |
-| **Agent Team** | A reusable roster and orchestration definition. Every Agent can use a different Harness, Provider Account and model. |
-| **Runtime & Providers** | The setup and health surface for Harness runtimes, Provider Accounts, models, credentials and diagnostics. |
-| **RoundTable** | A governed collaboration and handoff surface. Seats can be added by drag and drop; it is not the default way to start work. |
+以下能力继承自上游实现，不代表 ZoriDesk 新增，也不代表已在当前环境验证：
 
-The Mission Board is a projection of Missions, not a place where every internal
-object is flattened into cards. A Mission title is the entry point; Mission
-Room is where the single workflow and its Team execution are understood.
+| 模块 | 作用 |
+| --- | --- |
+| macOS 工作台 | SwiftUI 对话、Mission 与运行工具配置界面 |
+| Go 后台服务 | 本地接口、任务协调、权限判断和执行管理 |
+| Harness 适配 | 对接 Codex、Claude Code、OpenCode、Pi 等 Agent 工具 |
+| 任务与验收 | 团队任务组织、执行状态、结果证据和人工干预 |
+| 本地状态 | SQLite 事件记录，以及可重建的查询视图 |
+| 凭证管理 | 凭证存储、短期使用授权和本地通信边界 |
+| 沙箱接口 | 创建、执行、取消、暂停、恢复、销毁的后端抽象 |
 
-## Conversation
+**沙箱边界：** 当前 Loopback 后端通过本机进程执行，不是生产级隔离环境。Docker 和远端 Kubernetes 沙箱是计划方向，尚未实现为本项目新增能力。不要将现有执行器用于任意不可信代码。
 
-Conversation follows the interaction model users already know from Codex and
-Claude Code: the center of the App is the dialogue, while navigation and
-governance stay available at the sides.
+## 改进路线
 
-- A new App session opens into Conversation.
-- Multiple conversations are isolated and remain navigable in the sidebar.
-- The selected reply shows its actual Harness, Provider Account, model and
-  reasoning level.
-- The current response can be stopped without deleting the Conversation.
-- A Conversation can be copied as a readable transcript.
-- A proposal can become a Mission without re-entering its objective.
+按小范围、可验证的变化逐步推进，不以提交数量作为目标。
 
-### Switching routes
+- [x] 建立 ZoriDesk 仓库，保留既有代码与提交历史。
+- [x] 整理项目定位、源码导航与能力边界。
+- [ ] 统一项目品牌：应用名、服务标识、构建与安装配置，明确数据迁移策略。
+- [ ] 完善开发文档和无需真实模型账号的基础检查流程。
+- [ ] 解耦首次启动与特定运行工具的依赖，改善配置与错误提示。
+- [ ] 补充输出大小限制、取消和资源回收相关回归测试。
+- [ ] 实现 Docker 执行后端，明确资源、挂载、网络与凭证边界。
+- [ ] 在本地执行闭环稳定后，评估远端 Kubernetes 沙箱接入。
 
-A route is an executable combination, not another Provider:
+每项计划在实现和验证后再标记完成；性能数字、兼容性和安全性结论以实际测试为准。
 
-```text
-Harness + Provider Account + Credential Revision + Model + Limits
+## 源码导航
+
+| 路径 | 内容 |
+| --- | --- |
+| `apps/macos/` | 桌面应用与 SwiftUI 界面 |
+| `cmd/loomd/` | 后台服务入口与组件装配 |
+| `internal/app/` | 任务和配置协调 |
+| `internal/harnessgateway/` | Agent 工具会话与生命周期管理 |
+| `internal/runtime/` | 运行工具发现与适配 |
+| `internal/execution/` | 工具执行与策略检查 |
+| `internal/sandbox/` | 沙箱接口与实验后端 |
+| `internal/credentials/` | 凭证管理 |
+| `internal/journal/` | 事件持久化 |
+| `internal/projection/` | 状态查询视图 |
+
+建议先看服务入口与组件装配，再沿一次任务进入协调、执行与结果记录链路。
+
+## 开发起点
+
+当前 macOS 应用面向 macOS 14+、Apple silicon；Swift 工具链要求见 `apps/macos/Package.swift`，Go 版本要求见 `go.mod`（当前声明 Go 1.25.5）。运行工具及其依赖需要单独配置。
+
+```sh
+git clone https://github.com/ggggggtm/ZoriDesk.git
+cd ZoriDesk
 ```
 
-Changing route creates an immutable Conversation Segment. Loom does not mutate
-the previous Segment or pass a Provider-native session identifier to another
-Provider. When context or trust boundaries change, the App asks how to proceed:
+修改前阅读 [AGENTS.md](AGENTS.md) 与相关代码；历史架构和开发文档可辅助理解。`docs/CURRENT.md`、`CHANGELOG.md` 和 `.loom-evidence/` 中的既有验收记录属于上游历史，不代表本项目已经复验或发布。
 
-- **Continue with context** sends the policy-admitted relevant context.
-- **Summary only** sends goals, confirmed constraints, decisions and current
-  state with explicit omissions.
-- **Start clean** begins with the current request and required policy only.
+本轮未执行构建、测试、安装或真实模型调用。后续验证将区分源码检查、本地运行与使用真实账号的端到端测试；未经明确授权不消耗模型额度。
 
-Context Capsules carry provenance and disclosure metadata. Previous model
-output remains untrusted input; hidden reasoning and credentials are never
-transferred.
+## 来源与许可
 
-## Missions
+ZoriDesk 基于 [Loom](https://github.com/tttboy123/loom) 演进，初始化基线为 `dae84547bba0b9a429e5ad5dfd12b85505f94bc4`。保留上游提交历史及必要版权说明，使用 [Apache-2.0](LICENSE) 许可证。
 
-A Mission is one execution journey, not a second kind of chat and not a dump of
-all project state. It has a title, a link to its source Conversation when one
-exists, a Team, a task graph and a sequence of independently audited Attempts.
-
-Mission Room presents:
-
-- the objective and current lifecycle state;
-- each Agent's frozen Harness, Provider Account, model and status;
-- visible Agent output while execution is in progress;
-- node progress, dependencies and failure isolation;
-- published results and workspace artifacts;
-- evidence, accounting, incidents and recovery actions.
-
-Live Agent output is marked tentative until accepted terminal Evidence exists.
-Prompts, secrets, Provider response bodies and hidden reasoning are excluded
-from the operational stream.
-
-### Human intervention
-
-Blocked, Failed and Cancelled Missions keep a **Continue this Mission** composer.
-Guidance opens a prefilled review for the same Team and starts a fresh Attempt
-only after explicit confirmation. The old Attempt, output, failure and Incident
-remain unchanged and auditable.
-
-## Agent Teams
-
-Team-level defaults initialize new Agents; they do not overwrite an Agent's
-independent binding. The execution chain is:
-
-```text
-Team Role
-  -> Agent Definition
-  -> Execution Profile
-  -> Harness Adapter
-  -> Provider Account / Credential Revision
-  -> Model / Limits / Capabilities
-```
-
-The Dispatcher resolves and freezes this chain per Agent and per Attempt. One
-Provider Account failure blocks only the affected Agent. Fallback is explicit,
-versioned and auditable; Loom does not silently move a Claude or Codex Agent to
-another Provider.
-
-## Runtime, Provider And Model
-
-The three selectors answer different questions:
-
-| Dimension | Question | Examples |
-|---|---|---|
-| **Harness runtime** | How is the Agent executed? | Codex, Claude Code, OpenCode, Loom Native, Pi |
-| **Provider Account** | Which model service and credential authority are used? | OpenAI, Anthropic, DeepSeek, Kimi, MiniMax |
-| **Model** | Which model does that route invoke? | A model supported by the selected account and Harness |
-
-OpenCode is a Harness runtime. It may execute a DeepSeek or MiniMax route, but
-it must not appear as duplicate `opencode-deepseek` or `opencode-minimax`
-Provider Accounts. Provider Directory is built from model Providers; Runtime
-inventory is built from detected Harnesses; the route menu combines them only
-at the point of execution.
-
-The Provider catalog includes official, gateway, cloud, local and custom
-compatible descriptors. A catalog entry means Loom understands the setup
-contract; it does not claim that the current machine has a credential, a
-compatible runtime or a live-verified route. The App shows those states
-separately.
-
-## Credentials And Privacy
-
-Normal operation uses the Loom-owned Credential Vault. The macOS Keychain is a
-migration source only and is not read for every Conversation turn or Agent
-Attempt.
-
-- Secrets enter through the private local IPC boundary only during import or
-  replacement.
-- The daemon acquires short-lived, exact credential leases by Provider Account,
-  reference and revision.
-- Credentials do not enter Conversation transcripts, Prompts, Teams, Journal,
-  Evidence, diagnostics, process arguments or global environment variables.
-- Operational diagnostics contain safe stage, timing, result and Incident IDs,
-  not user content or Provider bodies.
-- Vault, Conversation and export encryption use separate key domains and fail
-  closed on identity, revision or integrity drift.
-
-The default local key-file mode protects against disclosure of the Vault
-database by itself. It does not claim protection from an attacker who already
-controls the same macOS account, root or daemon memory; use FileVault and normal
-device security as part of the threat model.
-
-## Failure And Diagnostics
-
-The UI does not reduce every failure to `Unavailable`. Provider import,
-verification, Conversation dispatch and Agent Attempts expose a privacy-safe
-stage, retryability, recovery action and Incident ID.
-
-Users can retry, inspect diagnostics or copy the Incident ID without opening a
-terminal. Journal facts remain separate from operational diagnostics: the
-Journal is execution authority; diagnostics help explain what happened.
-
-## Current Release Boundary
-
-`v0.5.3-rc.1` includes the Phase 2D product boundary and later user-experience
-hardening through Build 188:
-
-- App-managed bundled daemon startup;
-- Conversation Profiles, Route Segments and Context Capsules;
-- Loom Credential Vault and short-lived credential leases;
-- independent per-Agent execution bindings;
-- Mission creation from Conversation, live Agent activity and result opening;
-- actionable blocked-Mission intervention;
-- Provider / Runtime / route separation, including OpenCode;
-- Incident diagnostics, controlled failure isolation, fallback and accounting;
-- governed RoundTable sessions and drag-and-drop seating.
-
-Not claimed by this release candidate:
-
-- one installed Team using four independently credentialed real Providers at
-  the same time;
-- a live revoke/rate-limit test against a user's real Provider Account;
-- a complete real Conversation through a newly imported custom endpoint;
-- cloud sync, multi-user collaboration or unattended standing orders.
-
-## Build And Install On macOS
-
-Requirements:
-
-- macOS 14 or newer on Apple silicon;
-- Go 1.22 or newer;
-- Swift 6;
-- one or more supported Harness CLIs for native-runtime routes.
-
-Build a signed local bundle into a new private directory:
-
-```bash
-release_root="$(mktemp -d)"
-scripts/build-loom-local-app.sh --output "$release_root/Loom.app"
-```
-
-Install it transactionally for the current user:
-
-```bash
-mkdir -p "$HOME/Applications"
-scripts/install-loom-local-app.sh \
-  --app "$release_root/Loom.app" \
-  --destination "$HOME/Applications/Loom.app"
-open "$HOME/Applications/Loom.app"
-```
-
-The installer validates ownership, file modes, bundle identity, architecture
-and code signature. It keeps one rollback bundle at `Loom.app.previous`.
-
-## Verify A Source Checkout
-
-```bash
-go test -p 4 ./... -count=1 -timeout=15m
-go test -race ./internal/api ./internal/app ./internal/execution \
-  ./internal/localipc ./internal/runtime/...
-go vet ./...
-
-swift test --package-path apps/macos
-scripts/test-build-loom-local-app.sh
-scripts/test-install-loom-local-app.sh
-git diff --check
-```
-
-External Provider tests may spend quota or use real credentials and are not
-part of the default source gate. Run only the explicitly scoped live acceptance
-scripts with user authorization.
-
-## Architecture In One View
-
-```mermaid
-flowchart LR
-    U["User"] --> A["Loom macOS App"]
-    A -->|"private local IPC"| D["App-managed loomd"]
-
-    D --> V["Credential Vault"]
-    D --> J[("Append-only Event Journal")]
-    J --> P["Rebuildable projections"]
-    P --> A
-
-    D --> G["Harness Gateway"]
-    G --> H["Codex / Claude Code / OpenCode / Pi / Loom Native"]
-    H --> M["Model Providers"]
-
-    D --> E["Evidence and artifacts"]
-    H -. "proposal, never authority" .-> D
-```
-
-The daemon is the local authority for policy, credentials, execution and state
-transitions. Clients render projections and submit versioned commands; Agent
-output cannot approve itself or directly write terminal authority.
-
-## Repository Map
-
-```text
-apps/macos/                 Native SwiftUI App
-cmd/loomd/                  App-managed local daemon
-internal/api/               Local product API
-internal/app/               Mission and setup coordination
-internal/contextcapsule/    Context admission, packing and disclosure
-internal/credentials/       Credential contracts and Loom Vault
-internal/harnessgateway/    Segment Sessions and Harness lifecycle
-internal/mcp/tencent/       Decoupled Tencent Cloud MCP demo component
-internal/provider/          Provider and model catalogs/adapters
-internal/runtime/           Harness adapters and runtime discovery
-internal/work/              Mission, Run, Attempt and authority
-internal/journal/           Append-only Event Journal
-internal/projection/        Rebuildable read models
-.loom-evidence/             Contracts and acceptance evidence
-```
-
-## Development Rules
-
-Read [AGENTS.md](./AGENTS.md), [Current status](./docs/CURRENT.md) and the
-relevant ADR or contract before changing behavior. Preserve these invariants:
-
-1. Ordinary Conversation never creates a Team implicitly.
-2. Team drafts and execution require explicit user confirmation.
-3. Agent and model output is a proposal, never execution authority.
-4. Secrets never enter source control, Prompt, Journal, Evidence or diagnostics.
-5. An executor cannot mark its own work done.
-6. Historical failed evidence remains historical failure evidence.
-
-Current, source-only, experimental and deferred capabilities must remain clearly
-labelled. Tests and installed acceptance outrank roadmap prose.
+本 README 由 ZoriDesk 维护者于 2026-10-13 为项目初始化改写；后续独立改动以本仓库的实际提交和验证记录为准。
