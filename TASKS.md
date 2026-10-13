@@ -16,10 +16,10 @@
 
 | ID | 工作 | 初始状态 | 前置条件 |
 | --- | --- | --- | --- |
-| Q00 | 开发环境与提交通路核验 | ready | 正确仓库、账号和权限 |
+| Q00 | 开发环境与提交通路核验 | review | 独立 checkout、SSH 与真实推送已核验；锁定依赖校验、sandbox 包 11 项测试通过；见 STATUS.md |
 | Q01 | 维护规则与仓库边界 | done | AGENTS.md 已更新并复核，提交 8bba855 |
 | Q02 | 当前状态与详细任务队列 | done | STATUS.md、本文及 README 导航 |
-| Q03 | 贡献指南与反馈模板 | ready | 已阅读维护规则 |
+| Q03 | 贡献指南与反馈模板 | review | codex/q03-contribution-guide；静态检查后待审合并，不改变 Issues 设置 |
 | Q04 | 架构、用户路径与源码导航 | ready | 逐项核对当前代码 |
 | Q05 | 无真实账号的测试基线与 CI | backlog | Q00 |
 | Q06 | 用户可见品牌统一 | backlog | Q05 |
@@ -67,6 +67,8 @@ Q01、Q02 为 2026-10-13 初始化文档交付；只代表维护文档，不代�
 - 缺陷要求复现步骤、预期/实际、环境、脱敏日志；PR 要求变化原因、验证、兼容影响与未覆盖项。
 - 先检查本 fork 是否启用 Issues，未启用时文档说明限制，不自动修改仓库设置或去上游提 Issue。
 - 验收：模板路径和语法正确；提交目标为本仓库；命令有依据，不承诺未测的平台。
+
+2026-10-13：独立分支 [codex/q03-contribution-guide](https://github.com/ggggggtm/ZoriDesk/tree/codex/q03-contribution-guide) 增加 CONTRIBUTING、缺陷/功能请求和 PR 模板及 README 导航。Issues 尚未启用，未验证网页提报，不修改设置；分支待审，不标 done。检查范围和与 Q00 待审记录的关系见 STATUS.md 的 Q03 记录；此分支基于 main，不包含 Q00 两个提交。
 
 ### Q04：从用户流程讲清架构
 

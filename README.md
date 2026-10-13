@@ -8,7 +8,7 @@ ZoriDesk 将 Agent 对话、任务协作、执行审批和结果追踪放在同�
 
 > **项目状态：初始化 / 持续建设。** 本次初始化调整项目介绍与演进方向，尚未改变运行逻辑，也没有重新验证构建和端到端运行。应用名称、后台进程 `loomd`、模块路径与安装脚本暂时沿用既有实现，后续分阶段统一。
 
-[当前状态](STATUS.md) · [详细任务队列](TASKS.md) · [维护规则](AGENTS.md) · [改进路线](#改进路线) · [源码导航](#源码导航) · [架构文档](docs/ARCHITECTURE.md) · [开发指南](docs/DEVELOPMENT.md) · [许可证](LICENSE)
+[当前状态](STATUS.md) · [详细任务队列](TASKS.md) · [维护规则](AGENTS.md) · [贡献指南](CONTRIBUTING.md) · [改进路线](#改进路线) · [源码导航](#源码导航) · [架构文档](docs/ARCHITECTURE.md) · [开发指南](docs/DEVELOPMENT.md) · [许可证](LICENSE)
 
 ## 解决什么问题
 
