@@ -32,6 +32,8 @@ jobs:
           cache: false
       - name: Download locked public Go modules
         run: go mod download
+      - name: Run account-free baseline
+        run: bash scripts/verify-sandbox.sh
       - name: Run account-free baseline with race detection
         run: bash scripts/verify-sandbox.sh --race
       - name: Ensure dependency locks remain unchanged
