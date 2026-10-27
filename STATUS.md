@@ -138,7 +138,10 @@ git diff --exit-code -- go.mod go.sum
 
 - 已确认 [首次运行 40056339209](https://github.com/ggggggtm/ZoriDesk/actions/runs/40056339209) 在依赖下载阶段失败：runner 的 Go 1.24.13 低于 go.mod 要求的 1.25.5，且 `GOTOOLCHAIN=local` 禁止隐式升级；race 步骤被跳过，不是测试通过或业务断言失败。
 - 用户明确授权 GitHub CI 下载对应 Go 工具链。原分支补上固定 SHA 的 `actions/setup-go`，先从 go.mod 准备 Go，再下载锁定依赖；不改本机工具链、依赖版本、权限或测试覆盖。
-- 推送前验证工作流的 setup 顺序与 go.mod 版本来源；修复后的 GitHub CI 结果须在实际运行后补录。本分支仍待验收，不合并 main，不推进 Q09。
+- 修复提交 `129da7910e3189a7fc76526504ad89bfc2a6ee0e` 已推送原分支；配置顺序、固定 SHA、只读权限检查及本地 race 基线通过，依赖锁文件未变。
+- [运行 40497053197](https://github.com/ggggggtm/ZoriDesk/actions/runs/40497053197) 已在 Linux/amd64 成功下载并使用 Go 1.25.5，依赖下载成功，实际执行了 race 基线；最终仍失败，不能标 CI 通过。唯一失败用例为 `TestLoopbackCancelTerminatesLongCommand`：`loopback_test.go:98: cancel did not terminate the command`，5 秒内未收到取消后的执行结果。
+- 源码核验：`Exec` 使用 `sh -c` 并收集输出，`Cancel` 只对主进程调用 `Process.Kill`。未清理子进程及其继承的管道是与日志一致的原因推断，尚未逐进程观测；测试自身还以固定 300ms 等待进程启动，后续需排除启动竞态。不能用放宽超时或跳过测试掩盖问题。
+- 当前只修复 CI 工具链配置，没有改进程运行逻辑。Linux 取消/回收涉及原 Q10 范围，待维护者确认提前修复该阻塞；Q05 保持未验收，不合并 main、不推进 Q09。全仓、Swift 应用与真实 E2E 仍未验证。
 
 ## 状态维护约定
 
