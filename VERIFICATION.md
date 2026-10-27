@@ -35,7 +35,7 @@ bash scripts/verify-sandbox.sh --race
 
 ## CI 与 macOS 的边界
 
-[sandbox-baseline.yml](.github/workflows/sandbox-baseline.yml) 在 main、codex 分支 push 和面向 main 的 PR 上运行同一入口的 race 模式。使用只读 contents 权限、固定 SHA 的 checkout、不持久化 Git 凭据、不注入真实密钥、不上传产物。只下载锁定的公开 Go 模块，使用 runner 现有工具链；版本不足或依赖不可用时明确失败，不自动安装或升级。CI 运行测试代码本身不等于网络隔离。
+[sandbox-baseline.yml](.github/workflows/sandbox-baseline.yml) 在 main、codex 分支 push 和面向 main 的 PR 上运行同一入口的 race 模式。使用只读 contents 权限、固定 SHA 的 checkout、不持久化 Git 凭据、不注入真实模型密钥、不上传产物。维护者于 2026-10-27 授权仅在 GitHub CI 准备对应 Go 工具链：固定 SHA 的 `actions/setup-go` 从 `go.mod` 读取版本，必要时下载；不追踪 latest、不启用依赖缓存，然后下载锁定的公开 Go 模块。保留 `GOTOOLCHAIN=local`，后续命令不会隐式切换工具链；本机脚本仍离线、不安装 Go。下载失败或版本不满足时明确失败，不降低项目版本要求。CI 运行测试代码本身不等于网络隔离。
 
 工作流文件存在不等于 Actions 已运行。未启用、需审批或缺少 runner 条件时，先记录事实并请求处理，不自动更改仓库权限或 Actions 设置。
 

@@ -1,6 +1,6 @@
 # ZoriDesk 当前状态
 
-更新日期：2026-10-24。本文只记录 ZoriDesk 的事实，不把上游验收记录当作本项目复验结果。
+更新日期：2026-10-27。本文只记录 ZoriDesk 的事实，不把上游验收记录当作本项目复验结果。
 
 ## 项目身份与阅读顺序
 
@@ -133,6 +133,12 @@ git diff --exit-code -- go.mod go.sum
 - `bash -n`、不支持参数返回退出码 2、工作流 YAML 解析/权限检查、`git diff --check` 与 go.mod/go.sum 无变化检查通过。整个验证入口离线使用缓存，未下载工具/依赖、调用模型、启动应用或安装服务。
 - 工作流使用固定 checkout SHA，runner 现有 Go、锁定公开依赖和相同 race 入口。尚无本切片的 GitHub CI 成功证据，不自动开启 Actions，不称 CI 已通过；推送后单独核验运行结果。
 - Q05 仍 `in_progress`，本切片供审查；Q04 仅补验证路径，完整架构未完成。未运行全仓测试、Swift 应用构建、真实模型 E2E 或 Docker。Q09 等待 Q05 验收合入，不因本地测试通过提前执行。
+
+## Q05 CI 工具链修复：2026-10-27
+
+- 已确认 [首次运行 40056339209](https://github.com/ggggggtm/ZoriDesk/actions/runs/40056339209) 在依赖下载阶段失败：runner 的 Go 1.24.13 低于 go.mod 要求的 1.25.5，且 `GOTOOLCHAIN=local` 禁止隐式升级；race 步骤被跳过，不是测试通过或业务断言失败。
+- 用户明确授权 GitHub CI 下载对应 Go 工具链。原分支补上固定 SHA 的 `actions/setup-go`，先从 go.mod 准备 Go，再下载锁定依赖；不改本机工具链、依赖版本、权限或测试覆盖。
+- 推送前验证工作流的 setup 顺序与 go.mod 版本来源；修复后的 GitHub CI 结果须在实际运行后补录。本分支仍待验收，不合并 main，不推进 Q09。
 
 ## 状态维护约定
 
