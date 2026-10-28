@@ -8,10 +8,7 @@ package sandbox
 
 import (
 	"bufio"
-	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -141,7 +138,7 @@ func (backend *LoopbackBackend) Exec(ctx context.Context, request ExecRequest) (
 		control.canceled.Store(true)
 		return stopLoopbackProcess(command.Process)
 	}
-	var output bytes.Buffer
+	var output outputTail
 	command.Stdout = &output
 	command.Stderr = &output
 
@@ -222,7 +219,7 @@ func (backend *LoopbackBackend) Exec(ctx context.Context, request ExecRequest) (
 			return ExecResult{}, fmt.Errorf("loopback: supervisor exited without command status: %w", statusErr)
 		}
 	}
-	digest := digestBytes(output.Bytes())
+	digest := output.Digest()
 	return ExecResult{ExitCode: exitCode, OutputDigest: digest}, nil
 }
 
@@ -483,14 +480,6 @@ func sanitizedEnv(workdir string) []string {
 		"LANG=C",
 		"LC_ALL=C",
 	}
-}
-
-func digestBytes(data []byte) string {
-	if len(data) > loopbackOutputLimit {
-		data = data[len(data)-loopbackOutputLimit:]
-	}
-	sum := sha256.Sum256(data)
-	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
 func containsString(values []string, want string) bool {
