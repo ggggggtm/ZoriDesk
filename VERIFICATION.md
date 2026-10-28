@@ -50,7 +50,22 @@ bash scripts/verify-sandbox.sh --race
 
 例如一次暂停编号为 7，恢复必须收到 `resumed 7` 才清除该待确认请求；随后 `pause 8` 即使在监督进程刚写完确认时到达，也会留在管道里等待读取。若命令完成事件先于暂停事件被处理，则执行结束，恢复会收到终止错误；并不保证已结束的命令还能暂停恢复。该协议是进程内生命周期控制，不是可持久化、可跨服务重启恢复的任务队列。
 
-这里的“清理”指受控命令及同组后代不再运行、管道关闭、直接子进程由 Go 等待回收；成为孤儿的后代若暂时为僵尸，由操作系统的收养进程回收，不能宣称 Go 已回收全部后代。主动 `setsid` 逃逸进程组、攻击监督进程等恶意行为不在此宿主机测试后端的保证内。输出仍先收集后计算摘要，运行期内存限制属于后续 Q09，本次未解决。
+这里的“清理”指受控命令及同组后代不再运行、管道关闭、直接子进程由 Go 等待回收；成为孤儿的后代若暂时为僵尸，由操作系统的收养进程回收，不能宣称 Go 已回收全部后代。主动 `setsid` 逃逸进程组、攻击监督进程等恶意行为不在此宿主机测试后端的保证内。Q05 本身未解决输出缓存增长；下节描述独立 Q09 分支的改动，合并状态以 STATUS 为准。
+
+## Q09：为什么输出再多也不用全部存下
+
+**分支实现，未合入 main。**当前 `ExecResult` 只有退出码与摘要，没有 stdout/stderr 原文。旧逻辑是收集全部输出，结束后只对最后 64 KiB 算 SHA-256；本次保留这个结果契约，把限制前移到每次写入时。
+
+流程：命令 stdout/stderr → 同一个 `outputTail.Write` → 固定 64 KiB 环形数组 → `command.Wait` 等待输出管道读完 → `outputTail.Digest` → `ExecResult`。写满后覆盖最旧数据，超大单次写入直接保留该块尾部；返回长度仍是原始块长，避免短写让管道读取中断、影响子进程或造成死锁。并发访问由同一把锁保护。
+
+例如先输出 2 MiB 数据再输出 `failure`，只保留“此前数据最后 65529 字节 + failure”，算出的摘要与旧实现完全相同。溢出不是错误，不改变真实退出码；也没有把额外的“已截断”文本塞进摘要。摘要不是全文完整性证明：两个输出只要最后 64 KiB 相同，摘要就相同，这是兼容既有契约的明确限制。
+
+- 关键实现：[output_tail.go](internal/sandbox/output_tail.go) 的 `Write`、`Digest`；[loopback.go](internal/sandbox/loopback.go) 的 `Exec` 将两个输出流接到同一 writer。
+- 事件路径：[reconcile.go](internal/sandbox/reconcile.go) 的 `Controller.Exec` 将结果写入 `SandboxExecCompleted`，重复 operationID 从事件记录返回，不重复运行命令；字段和历史数据格式未改。
+- 产品边界：`BackendGate` 当前检查能力和策略；`execution.Adapter` 的 Bash 路径仍调用其装配的 `executor.Run`，不能把 gate 测试称作整套 UI 已改为执行 Loopback。本次直接后端测试和 Controller 重放测试证明本切片，不宣称所有应用输出路径有界。
+- 回归：[output_tail_test.go](internal/sandbox/output_tail_test.go) 验证边界、绕回、并发、真实大输出、失败退出、取消以及事件重放。写入零分配测试和固定数组实现证明收集器不随输出量扩容；不是整个应用内存压测或吞吐提升数据。
+
+stdout/stderr 仍是合并流，不保证并发进程之间的全局输出顺序；容量是两者合计 64 KiB，不是各 64 KiB。子进程仍可持续输出，受原有 timeout/cancel 控制；这里限制的是收集器保留的字节量，不限制子进程自己的内存，也不新增总输出配额或生产安全隔离。
 
 ## CI 与 macOS 的边界
 

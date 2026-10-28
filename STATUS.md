@@ -34,7 +34,7 @@
 ## 下一步
 
 1. Q00、Q03 经复核并按维护者明确授权合入 main，状态 done；不重复初始化或创建模板。此授权仅针对这两个任务，不改变以后定时维护的分支审查规则。
-2. Q05 的有界验证基线及阻塞修复已验收合入 main，状态 done。下次定时维护优先 Q09 输出限制；本次合并不顺带实现 Q09，Q10 仅已交付取消/清理与暂停恢复切片，不代表其全部完成。
+2. Q05 的有界验证基线及阻塞修复已验收合入 main，状态 done。Q09 已在 `codex/q09-bounded-output` 推进，先完成本分支验证与审查，不自动合并；Q10 仅已交付取消/清理与暂停恢复切片，不代表其全部完成。
 3. Q04 随代码和测试同步补充真实路径与关键函数，不阻塞 Q05/Q09；品牌与兼容性任务后置，原有验收、安全边界和分支审查规则保持不变。
 4. 执行前检查实际分支、未提交改动和待审查工作；有未完成任务先收尾，不机械开始新任务。
 
@@ -180,6 +180,17 @@ git diff --exit-code -- go.mod go.sum
 - 最新分支 HEAD 的实际 [CI 40511384968](https://github.com/ggggggtm/ZoriDesk/actions/runs/40511384968) 成功；普通与 race 各 55 个事件、无跳过。合并提交会另触发 [main 的 CI](https://github.com/ggggggtm/ZoriDesk/actions?query=branch%3Amain)，不能拿分支结果冒充合并提交结果。
 - CI 存在 Node.js 20 action 运行时弃用及 ubuntu-latest 镜像迁移提醒，当前运行成功；作为后续兼容性维护事项，不在本次合并中未经验证升级工具。
 - Q05 完成范围仅为可重复的 sandbox/testreport 基线与最小 CI。全仓、Swift 应用构建、真实模型 E2E、Docker、运行期输出限制仍未完成；Loopback 仍不是不可信代码安全隔离边界。
+
+## Q09：运行期输出有界化（2026-10-28）
+
+基准为 main `8f1935a5df2968997455ca3934d887f1b03c4933`，分支 `codex/q09-bounded-output`，仅修改 Loopback 输出收集及对应测试/说明，保留退出、取消、暂停恢复协议和接口。用户授权提交推送分支、核验真实 CI，不自动合并 main。
+
+- 原问题：`Exec` 使用 `bytes.Buffer` 收集全部 stdout/stderr，`digestBytes` 只在结束后取最后 64 KiB；摘要输入有上限，不代表运行时缓存有上限。
+- 实现：固定数组环形缓冲 `outputTail`，写入覆盖最旧字节，始终返回完整写入长度并继续排空管道；最后按时间顺序计算尾部摘要。不缓存完整日志、不改变摘要范围或 journal schema，也不把溢出当作命令失败。
+- 回归先得到 `undefined: outputTail` 编译失败，再实现；包含空/小/边界/超限输出、多种分块与绕回、写入零分配、并发写入/取摘要、真实 stdout/stderr 并发输出及退出码 7，另补大量输出后取消和真实 Loopback + 临时 journal 重放。
+- 本地普通/race 验证入口各通过 91 个 test/subtest 成功事件、无跳过，包含格式、依赖校验、编译、vet；新输出相关回归连续 5 轮通过。另已执行 `TestSandboxWire*` 3 项与 `TestRedSB2*` 4 项门控/调用方回归，不把它们当作真实 Loopback 端到端路由验证。依赖锁文件不变。
+- 完整候选差异经独立只读复核，无阻断问题。远端 CI 需在本分支推送后单独核验，不以本地结果代替；Q09 为 review、未合入 main，不记 done。CI 状态可从 [本分支运行记录](https://github.com/ggggggtm/ZoriDesk/actions?query=branch%3Acodex%2Fq09-bounded-output) 查看。
+- 边界：每次 Exec 的输出载荷缓冲固定 64 KiB，不等于整个进程 RSS、子进程内存或总 CPU 时间被限制；原始输出未对外返回。产品默认执行器与其他适配器不在本切片范围。全仓/Swift/真实模型 E2E/Docker 未验证。
 
 ## 状态维护约定
 
