@@ -25,14 +25,20 @@ import (
 const loopbackOutputLimit = 64 << 10
 
 type LoopbackBackend struct {
-	mu        sync.Mutex
-	workRoot  string
-	timeout   time.Duration
-	dirs      map[string]string
-	procs     map[string]*os.Process
-	done      map[string]chan struct{}
-	controls  map[string]*loopbackControl
-	destroyed []string
+	mu       sync.Mutex
+	workRoot string
+	timeout  time.Duration
+	dirs     map[string]string
+	ready    map[string]bool
+	owned    map[string]os.FileInfo
+	// Per-backend filesystem operations allow deterministic failure injection;
+	// production instances always use the standard-library implementations.
+	initializeDir func(string) error
+	removeDir     func(string) error
+	procs         map[string]*os.Process
+	done          map[string]chan struct{}
+	controls      map[string]*loopbackControl
+	destroyed     []string
 }
 
 func NewLoopbackBackend(workRoot string, timeout time.Duration) (*LoopbackBackend, error) {
@@ -49,6 +55,9 @@ func NewLoopbackBackend(workRoot string, timeout time.Duration) (*LoopbackBacken
 	return &LoopbackBackend{
 		workRoot: root, timeout: timeout,
 		dirs: make(map[string]string), procs: make(map[string]*os.Process), done: make(map[string]chan struct{}), controls: make(map[string]*loopbackControl),
+		ready: make(map[string]bool), owned: make(map[string]os.FileInfo),
+		initializeDir: func(path string) error { return os.Mkdir(filepath.Join(path, "tmp"), 0o700) },
+		removeDir:     os.RemoveAll,
 	}, nil
 }
 
@@ -60,19 +69,33 @@ func (backend *LoopbackBackend) Create(ctx context.Context, request CreateReques
 		return Instance{}, fmt.Errorf("loopback: instance %s destroyed", instanceID)
 	}
 	if _, exists := backend.dirs[instanceID]; exists {
+		if !backend.ready[instanceID] {
+			return Instance{}, fmt.Errorf("loopback: instance %s requires cleanup", instanceID)
+		}
 		return Instance{InstanceID: instanceID}, nil
 	}
+	if err := ctx.Err(); err != nil {
+		return Instance{}, err
+	}
 	workdir := filepath.Join(backend.workRoot, instanceID)
-	if err := os.MkdirAll(workdir, 0o700); err != nil {
-		return Instance{}, err
-	}
-	if err := os.MkdirAll(filepath.Join(workdir, "tmp"), 0o700); err != nil {
-		return Instance{}, err
-	}
-	if err := os.Chmod(workdir, 0o700); err != nil {
+	// Atomic creation never adopts a directory, file or symlink left by another
+	// owner/backend. Ownership is intentionally in-memory, not restart recovery.
+	if err := os.Mkdir(workdir, 0o700); err != nil {
 		return Instance{}, err
 	}
 	backend.dirs[instanceID] = workdir
+	info, err := os.Lstat(workdir)
+	if err != nil {
+		return Instance{}, err // Keep the claim, but never delete an unidentified path.
+	}
+	backend.owned[instanceID] = info
+	if err := backend.initializeDir(workdir); err != nil {
+		return Instance{}, errors.Join(err, backend.removeOwnedDir(instanceID))
+	}
+	if err := ctx.Err(); err != nil {
+		return Instance{}, errors.Join(err, backend.removeOwnedDir(instanceID))
+	}
+	backend.ready[instanceID] = true
 	return Instance{InstanceID: instanceID}, nil
 }
 
@@ -82,6 +105,10 @@ func (backend *LoopbackBackend) Exec(ctx context.Context, request ExecRequest) (
 	if !ok {
 		backend.mu.Unlock()
 		return ExecResult{}, fmt.Errorf("loopback: unknown instance %s", request.InstanceID)
+	}
+	if !backend.ready[request.InstanceID] {
+		backend.mu.Unlock()
+		return ExecResult{}, fmt.Errorf("loopback: instance %s requires cleanup", request.InstanceID)
 	}
 	if backend.destroyed != nil && containsString(backend.destroyed, request.InstanceID) {
 		backend.mu.Unlock()
@@ -352,12 +379,38 @@ func (backend *LoopbackBackend) Destroy(ctx context.Context, instanceID string) 
 	}
 	backend.mu.Lock()
 	defer backend.mu.Unlock()
-	if workdir, ok := backend.dirs[instanceID]; ok {
-		if err := os.RemoveAll(workdir); err != nil {
-			return err
-		}
-		delete(backend.dirs, instanceID)
+	return backend.removeOwnedDir(instanceID)
+}
+
+// removeOwnedDir is called with mu held. A failed removal retains the claim for
+// retry, but fences execution. A fresh backend must not infer ownership merely
+// from a matching instance ID/path. This is not a hostile-filesystem boundary.
+func (backend *LoopbackBackend) removeOwnedDir(instanceID string) error {
+	backend.ready[instanceID] = false
+	path, known := backend.dirs[instanceID]
+	if !known {
+		path = filepath.Join(backend.workRoot, instanceID)
 	}
+	current, err := os.Lstat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		delete(backend.dirs, instanceID)
+		delete(backend.ready, instanceID)
+		delete(backend.owned, instanceID)
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	owner := backend.owned[instanceID]
+	if !known || owner == nil || !current.IsDir() || !os.SameFile(owner, current) {
+		return fmt.Errorf("loopback: refusing cleanup of unowned path for %s", instanceID)
+	}
+	if err := backend.removeDir(path); err != nil {
+		return err
+	}
+	delete(backend.dirs, instanceID)
+	delete(backend.ready, instanceID)
+	delete(backend.owned, instanceID)
 	return nil
 }
 

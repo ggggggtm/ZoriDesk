@@ -20,14 +20,15 @@ import (
 )
 
 const (
-	EventCreated   = "SandboxInstanceCreated"
-	EventExecReq   = "SandboxExecRequested"
-	EventExecDone  = "SandboxExecCompleted"
-	EventExecFail  = "SandboxExecFailed"
-	EventCancelled = "SandboxCancelled"
-	EventPaused    = "SandboxPaused"
-	EventResumed   = "SandboxResumed"
-	EventDestroyed = "SandboxDestroyed"
+	EventCreated      = "SandboxInstanceCreated"
+	EventCreateFailed = "SandboxCreateFailed"
+	EventExecReq      = "SandboxExecRequested"
+	EventExecDone     = "SandboxExecCompleted"
+	EventExecFail     = "SandboxExecFailed"
+	EventCancelled    = "SandboxCancelled"
+	EventPaused       = "SandboxPaused"
+	EventResumed      = "SandboxResumed"
+	EventDestroyed    = "SandboxDestroyed"
 
 	streamPrefix = "sandbox/"
 	controllerID = "sb1"
@@ -38,6 +39,7 @@ var (
 	ErrUnknownInstance   = errors.New("unknown sandbox instance")
 	ErrStaleGeneration   = errors.New("stale sandbox generation")
 	ErrInstanceDestroyed = errors.New("sandbox instance already destroyed")
+	ErrInstanceNotReady  = errors.New("sandbox creation failed; cleanup required")
 )
 
 // InstanceState is the Journal-derived projection of one instance. It is a
@@ -51,6 +53,7 @@ type InstanceState struct {
 	State           string
 	ExecCount       int
 	Destroyed       bool
+	CreationFailed  bool
 }
 
 // ReconcileResult describes one instance cleaned during Reconcile.
@@ -111,7 +114,8 @@ func NewController(store *journal.Store, backend SandboxBackend, now func() time
 }
 
 // Create writes SandboxInstanceCreated, creates the backend instance, and on
-// backend failure closes the stream with a Destroyed(create_failed) fact.
+// backend failure records a sticky creation-failure fence. Destroyed is only
+// recorded after backend cleanup succeeds; failed cleanup remains reconcilable.
 func (c *Controller) Create(
 	ctx context.Context,
 	request CreateRequest,
@@ -122,6 +126,16 @@ func (c *Controller) Create(
 	}
 	instanceID := deterministicInstanceID(request.JobID, request.RunID, request.Generation)
 	streamID := streamPrefix + instanceID
+	previous, lookupErr := c.rebuildOne(ctx, instanceID)
+	if lookupErr != nil && !errors.Is(lookupErr, ErrUnknownInstance) {
+		return Instance{}, lookupErr
+	}
+	if previous.Destroyed {
+		return Instance{}, ErrInstanceDestroyed
+	}
+	if previous.CreationFailed {
+		return Instance{}, ErrInstanceNotReady
+	}
 	now := c.now().UTC()
 	body, err := json.Marshal(createdPayload{
 		InstanceID: instanceID, JobID: request.JobID, RunID: request.RunID,
@@ -142,14 +156,24 @@ func (c *Controller) Create(
 	}
 	instance, backendErr := c.backend.Create(ctx, request)
 	if backendErr != nil {
-		_ = c.recordDestroyed(ctx, instanceID, "create_failed", operationID, correlationID)
-		return Instance{}, backendErr
+		return Instance{}, c.cleanupFailedCreate(ctx, instanceID, "create_failed", operationID, correlationID, backendErr)
 	}
 	if instance.InstanceID != "" && instance.InstanceID != instanceID {
-		_ = c.recordDestroyed(ctx, instanceID, "instance_id_mismatch", operationID, correlationID)
-		return Instance{}, ErrInvalidInput
+		return Instance{}, c.cleanupFailedCreate(ctx, instanceID, "instance_id_mismatch", operationID, correlationID, ErrInvalidInput)
 	}
 	return Instance{InstanceID: instanceID}, nil
+}
+
+func (c *Controller) cleanupFailedCreate(ctx context.Context, instanceID, reason, operationID, correlationID string, cause error) error {
+	// Never trust a backend-returned mismatching ID as a cleanup target. If the
+	// journal is unavailable, report it rather than claiming a durable fence.
+	recordErr := c.recordInstanceEvent(ctx, EventCreateFailed, instanceID, reason, operationID, correlationID)
+	cleanupErr := c.backend.Destroy(ctx, instanceID)
+	if cleanupErr != nil {
+		return errors.Join(cause, recordErr, cleanupErr)
+	}
+	destroyedErr := c.recordDestroyed(ctx, instanceID, reason, operationID, correlationID)
+	return errors.Join(cause, recordErr, destroyedErr)
 }
 
 // Exec fences generation, records ExecRequested, runs the backend, then
@@ -287,6 +311,9 @@ func (c *Controller) Rebuild(ctx context.Context) ([]InstanceState, error) {
 				state.WorkspaceDigest = payload.WorkspaceDigest
 			}
 			state.State = EventCreated
+		case EventCreateFailed:
+			state.State = EventCreateFailed
+			state.CreationFailed = true
 		case EventExecReq:
 			state.ExecCount++
 			state.State = EventExecReq
@@ -357,6 +384,9 @@ func (c *Controller) instanceOp(
 	if state.Destroyed {
 		return ErrInstanceDestroyed
 	}
+	if state.CreationFailed && eventType != EventDestroyed {
+		return ErrInstanceNotReady
+	}
 	if err := backendOp(ctx, instanceID); err != nil {
 		return err
 	}
@@ -401,6 +431,10 @@ func (c *Controller) terminalForOp(
 }
 
 func (c *Controller) recordDestroyed(ctx context.Context, instanceID, reason, operationID, correlationID string) error {
+	return c.recordInstanceEvent(ctx, EventDestroyed, instanceID, reason, operationID, correlationID)
+}
+
+func (c *Controller) recordInstanceEvent(ctx context.Context, eventType, instanceID, reason, operationID, correlationID string) error {
 	if operationID == "" {
 		operationID = "destroy-" + instanceID
 	}
@@ -413,9 +447,9 @@ func (c *Controller) recordDestroyed(ctx context.Context, instanceID, reason, op
 		return err
 	}
 	event := journal.Event{
-		ID: eventID(EventDestroyed, streamID, operationID), StreamID: streamID,
-		IdempotencyKey: controllerID + "/" + EventDestroyed + "/" + instanceID + "/" + operationID,
-		Type:           EventDestroyed, SchemaVersion: 1, EmittedAt: now,
+		ID: eventID(eventType, streamID, operationID), StreamID: streamID,
+		IdempotencyKey: controllerID + "/" + eventType + "/" + instanceID + "/" + operationID,
+		Type:           eventType, SchemaVersion: 1, EmittedAt: now,
 		CorrelationID: correlationID, PayloadJSON: body,
 	}
 	_, err = c.append(ctx, streamID, []journal.Event{event})
@@ -429,6 +463,9 @@ func (c *Controller) fence(ctx context.Context, instanceID string, expectedGener
 	}
 	if state.Destroyed {
 		return ErrInstanceDestroyed
+	}
+	if state.CreationFailed {
+		return ErrInstanceNotReady
 	}
 	if state.Generation != expectedGeneration {
 		return fmt.Errorf("%w: want %d have %d", ErrStaleGeneration, expectedGeneration, state.Generation)
@@ -457,6 +494,9 @@ func (c *Controller) rebuildOne(ctx context.Context, instanceID string) (Instanc
 				state.WorkspaceDigest = payload.WorkspaceDigest
 			}
 			state.State = EventCreated
+		case EventCreateFailed:
+			state.State = EventCreateFailed
+			state.CreationFailed = true
 		case EventExecReq:
 			state.ExecCount++
 			state.State = EventExecReq

@@ -38,6 +38,222 @@ func newLoopback(t testing.TB) *LoopbackBackend {
 	return backend
 }
 
+func TestLoopbackCreatePreservesUnownedPaths(t *testing.T) {
+	for _, kind := range []string{"directory", "file", "symlink"} {
+		t.Run(kind, func(t *testing.T) {
+			backend := newLoopback(t)
+			request := CreateRequest{JobID: "existing", RunID: kind, Generation: 1}
+			id := deterministicInstanceID(request.JobID, request.RunID, request.Generation)
+			path := filepath.Join(backend.workRoot, id)
+			target := t.TempDir()
+			marker := filepath.Join(target, "keep")
+			if err := os.WriteFile(marker, []byte("existing data"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			switch kind {
+			case "directory":
+				if err := os.Mkdir(path, 0o750); err != nil {
+					t.Fatal(err)
+				}
+				marker = filepath.Join(path, "keep")
+				if err := os.WriteFile(marker, []byte("existing data"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			case "file":
+				marker = path
+				if err := os.WriteFile(path, []byte("existing data"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			case "symlink":
+				if err := os.Symlink(target, path); err != nil {
+					t.Fatal(err)
+				}
+			}
+			before, err := os.Lstat(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := backend.Create(context.Background(), request); err == nil {
+				t.Errorf("Create accepted an unowned %s", kind)
+			}
+			// A cleanup request must neither adopt nor remove this pre-existing path.
+			if err := backend.Destroy(context.Background(), id); err == nil {
+				t.Errorf("Destroy reported unowned %s as cleaned", kind)
+			}
+			after, err := os.Lstat(path)
+			if err != nil || !os.SameFile(before, after) || before.Mode() != after.Mode() {
+				t.Fatalf("existing path changed: before=%v after=%v err=%v", before, after, err)
+			}
+			if data, err := os.ReadFile(marker); err != nil || string(data) != "existing data" {
+				t.Fatalf("existing data changed: %q %v", data, err)
+			}
+		})
+	}
+}
+
+func TestLoopbackPartialCreateCleanupRetry(t *testing.T) {
+	for _, failCleanup := range []bool{false, true} {
+		t.Run(fmt.Sprintf("cleanup-fails-%t", failCleanup), func(t *testing.T) {
+			backend := newLoopback(t)
+			initErr := errors.New("injected initialization failure")
+			removeErr := errors.New("injected removal failure")
+			backend.initializeDir = func(path string) error {
+				if err := os.WriteFile(filepath.Join(path, "partial"), []byte("owned"), 0o600); err != nil {
+					return err
+				}
+				return initErr
+			}
+			backend.removeDir = func(path string) error {
+				if failCleanup {
+					return removeErr
+				}
+				return os.RemoveAll(path)
+			}
+			request := CreateRequest{JobID: "partial", RunID: "loopback", Generation: 1}
+			id := deterministicInstanceID(request.JobID, request.RunID, request.Generation)
+			path := filepath.Join(backend.workRoot, id)
+			_, err := backend.Create(context.Background(), request)
+			if !errors.Is(err, initErr) || (failCleanup && !errors.Is(err, removeErr)) {
+				t.Fatalf("lost failure: %v", err)
+			}
+			_, statErr := os.Stat(path)
+			if failCleanup {
+				if statErr != nil || backend.dirs[id] != path {
+					t.Fatalf("lost cleanup ownership: %v", statErr)
+				}
+				if _, err := backend.Create(context.Background(), request); err == nil {
+					t.Fatal("partial Create replay succeeded")
+				}
+			} else if !errors.Is(statErr, os.ErrNotExist) || len(backend.dirs) != 0 {
+				t.Fatalf("partial directory leaked: %v", statErr)
+			}
+			if _, err := backend.Exec(context.Background(), ExecRequest{InstanceID: id, Command: "touch must-not-exist"}); err == nil {
+				t.Fatal("partial initialization allowed Exec")
+			}
+			// Re-enable filesystem cleanup without changing ownership/ready state.
+			failCleanup = false
+			for i := 0; i < 2; i++ {
+				if err := backend.Destroy(context.Background(), id); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("retry left directory: %v", err)
+			}
+			if len(backend.dirs) != 0 || len(backend.ready) != 0 || len(backend.owned) != 0 {
+				t.Fatal("cleanup retained ownership")
+			}
+		})
+	}
+}
+
+func TestLoopbackDestroyFailureFencesExecAndPreservesOtherInstance(t *testing.T) {
+	backend := newLoopback(t)
+	ctx := context.Background()
+	first, err := backend.Create(ctx, CreateRequest{JobID: "first", RunID: "run", Generation: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := backend.Create(ctx, CreateRequest{JobID: "second", RunID: "run", Generation: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	removeErr := errors.New("injected remove failure")
+	backend.removeDir = func(string) error { return removeErr }
+	if err := backend.Destroy(ctx, first.InstanceID); !errors.Is(err, removeErr) {
+		t.Fatalf("expected removal failure: %v", err)
+	}
+	if _, err := backend.Exec(ctx, ExecRequest{InstanceID: first.InstanceID, Command: "true"}); err == nil {
+		t.Fatal("cleanup failure allowed Exec")
+	}
+	backend.removeDir = os.RemoveAll
+	if err := backend.Destroy(ctx, first.InstanceID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(backend.dirs[second.InstanceID]); err != nil {
+		t.Fatalf("other instance touched: %v", err)
+	}
+	if result, err := backend.Exec(ctx, ExecRequest{InstanceID: second.InstanceID, Command: "true"}); err != nil || result.ExitCode != 0 {
+		t.Fatalf("other instance unusable: %+v %v", result, err)
+	}
+}
+
+func TestLoopbackFreshBackendDoesNotAdoptLeftoverDirectory(t *testing.T) {
+	backend := newLoopback(t)
+	request := CreateRequest{JobID: "restart", RunID: "run", Generation: 1}
+	instance, err := backend.Create(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := backend.dirs[instance.InstanceID]
+	fresh, err := NewLoopbackBackend(backend.workRoot, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fresh.Create(context.Background(), request); err == nil {
+		t.Fatal("fresh backend adopted leftover")
+	}
+	if err := fresh.Destroy(context.Background(), instance.InstanceID); err == nil {
+		t.Fatal("fresh backend falsely confirmed cleanup")
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("original ownership lost: %v", err)
+	}
+}
+
+func TestLoopbackDestroyRejectsReplacedOwnedDirectory(t *testing.T) {
+	// No process is started. TempDir owns test cleanup, so a failed assertion
+	// cannot make the helper's Destroy cleanup adopt a replacement directory.
+	backend, err := NewLoopbackBackend(t.TempDir(), time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	instance, err := backend.Create(ctx, CreateRequest{JobID: "replacement", RunID: "run", Generation: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := backend.dirs[instance.InstanceID]
+	backup := filepath.Join(backend.workRoot, "original-backup")
+	if err := os.Rename(path, backup); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(path, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	marker := filepath.Join(path, "keep")
+	if err := os.WriteFile(marker, []byte("replacement data"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := backend.Destroy(ctx, instance.InstanceID); err == nil {
+		t.Fatal("Destroy accepted a replacement directory with a different identity")
+	}
+	if data, err := os.ReadFile(marker); err != nil || string(data) != "replacement data" {
+		t.Fatalf("replacement directory was changed: %q %v", data, err)
+	}
+	if backend.dirs[instance.InstanceID] != path {
+		t.Fatal("failed cleanup lost the original ownership claim")
+	}
+	// Preserve the replacement elsewhere, then restore the exact original
+	// directory and retry; a matching pathname alone was not sufficient.
+	replacement := filepath.Join(backend.workRoot, "preserved-replacement")
+	if err := os.Rename(path, replacement); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(backup, path); err != nil {
+		t.Fatal(err)
+	}
+	if err := backend.Destroy(ctx, instance.InstanceID); err != nil {
+		t.Fatalf("restored original could not be cleaned: %v", err)
+	}
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("original directory remains after retry: %v", err)
+	}
+	if data, err := os.ReadFile(filepath.Join(replacement, "keep")); err != nil || string(data) != "replacement data" {
+		t.Fatalf("retry touched replacement data: %q %v", data, err)
+	}
+}
+
 func TestLoopbackExecIsolatedWorkdirSanitizedEnv(t *testing.T) {
 	backend := newLoopback(t)
 	ctx := context.Background()

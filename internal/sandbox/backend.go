@@ -36,6 +36,10 @@ type Capabilities struct {
 }
 
 // SandboxBackend is the frozen 7-capability interface.
+// Create failure may leave resources owned by the deterministic requested ID;
+// Destroy must clean those resources idempotently and return an error until
+// cleanup is confirmed. It must never adopt another owner's resources merely
+// because a pathname or an untrusted returned ID matches.
 type SandboxBackend interface {
 	Create(context.Context, CreateRequest) (Instance, error)
 	Exec(context.Context, ExecRequest) (ExecResult, error)
