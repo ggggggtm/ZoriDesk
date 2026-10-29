@@ -27,8 +27,8 @@
 | Q07 | 安装与服务标识迁移 | backlog | Q05、Q06；与 Q08 联合设计 |
 | Q08 | 数据路径、凭证与兼容策略 | backlog | Q07/Q08 联合方案先评审 |
 | Q09 | 执行输出限制与回归测试 | done | 2026-10-28 按明确授权复核 b40a0fe 并合入 main；本地与分支 CI 普通/race 各 91 条记录通过无跳过，仅验收 Loopback 有界输出 |
-| Q10 | 取消、超时与资源回收 | in_progress | 创建失败/清理重试切片44f37c6已于2026-10-29按明确授权复核合入；仅核验未覆盖验收项，不重复取消/暂停恢复/清理重试 |
-| Q11 | 可选运行工具与启动解耦 | backlog | Q05 |
+| Q10 | 取消、超时与资源回收 | done | 2026-10-29 对照下方矩阵确认既定范围已覆盖；main 98181f6 与 CI40870981799，普通/race各107条无跳过 |
+| Q11 | 可选运行工具与启动解耦 | ready | Q05/Q10 已完成；下一次定时维护直接推进 |
 | Q12 | 可操作的诊断与脱敏 | backlog | Q10、Q11 |
 | Q13 | Docker 后端契约设计 | backlog | Q09、Q10；接口现状核验 |
 | Q14 | Docker 最小执行闭环 | backlog | Q13；Docker 环境可用 |
@@ -122,6 +122,18 @@ Q01、Q02 为 2026-10-13 初始化文档交付；只代表维护文档，不代�
 - 验收：测试可复现并通过，现有调用方仍兼容；已满足部分只补必要测试。
 
 ### Q10：取消、超时与回收
+
+**最新结论（2026-10-29）：done。**维护者要求已覆盖即关闭，下轮直接 Q11。主审与独立只读复核按下面三条原定验收逐项对照 main `98181f6`，无需追加实现。下方早期的 in_progress/待核验是历史过程，不覆盖本结论；不再每轮重复盘点或重写已完成代码。
+
+| 原验收要求 | 已合入回归证据 | 结果 |
+| --- | --- | --- |
+| context 取消到执行/清理，区分主进程退出与子进程残留 | `TestLoopbackCancellationReclaimsChildren`：显式取消、context、deadline、暂停中取消/超时，检查子进程停止；`TestLoopbackCompletionReclaimsBackgroundChild`：正常退出0/7后后台进程清理 | 已覆盖 |
+| 超时、用户取消、重复 Destroy、部分创建失败，避免误伤 | 取消矩阵中重复Destroy；`TestLoopbackPartialCreateCleanupRetry`、`TestCreateFailureRequiresConfirmedCleanup`；`TestLoopbackExecutionOwnership`、`TestLoopbackDestroyFailureFencesExecAndPreservesOtherInstance`、既有/替换目录保护测试 | 已覆盖 |
+| 正常完成、取消竞态、超时、重复清理回归，限定平台语义 | 启动取消、Resume/Cancel竞争、有序暂停恢复及确认重试；`TestRedSB6_ReconcileCleansUndestroyedWithoutReexec` 和创建失败后重建/重复清理 | 已覆盖 |
+
+证据源码：[loopback_test.go](internal/sandbox/loopback_test.go)、[reconcile_test.go](internal/sandbox/reconcile_test.go)。合并提交 [98181f6](https://github.com/ggggggtm/ZoriDesk/commit/98181f6c3796479afa7307450c2d7b27099def16) 的 [CI40870981799](https://github.com/ggggggtm/ZoriDesk/actions/runs/40870981799) 已实际成功，普通/race各107条记录无跳过；本地及7项调用方回归见STATUS。本轮未改源码，不把引用证据写成新跑测试。
+
+验收仅覆盖当前受控 Loopback/Controller：同组后代停止与直接子进程回收不等于任意逃逸进程树全部回收；跨全新后端持久恢复、恶意文件系统安全隔离、全仓E2E和旧版本回退限制保留。除非有具体新失败，不以这些范围外能力重新打开 Q10。
 
 2026-10-29 后续授权验收：维护者要求再次审查该分支并合并。全部差异经独立复核、本轮普通/race各107条记录无跳过及7项调用方回归通过，分支CI40870069154成功；保留历史合入main，合并CI需单独核验。本次切片不再待审、不重复实现。下次只检查 Q10 尚未覆盖的验收条目，必须先给出具体缺口与证据再开发，不能机械重跑已完成修复；已有验收覆盖则记录后进入 Q11。全新Loopback后端的持久所有权恢复、恶意进程/文件系统隔离不属于当前承诺，不为这些未承诺能力无限扩展Q10。整体任务未完成完整核验前仍保持in_progress。
 
