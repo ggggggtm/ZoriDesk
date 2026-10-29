@@ -68,6 +68,23 @@ bash scripts/verify-sandbox.sh --race
 
 stdout/stderr 仍是合并流，不保证并发进程之间的全局输出顺序；容量是两者合计 64 KiB，不是各 64 KiB。子进程仍可持续输出，受原有 timeout/cancel 控制；这里限制的是收集器保留的字节量，不限制子进程自己的内存，也不新增总输出配额或生产安全隔离。
 
+## Q10：创建失败不等于资源已经清理
+
+本切片由 `codex/q10-create-cleanup` 的 `44f37c6` 交付，已于 2026-10-29 经再次复核按维护者明确授权合入 main。背景是旧 `Controller.Create` 在后端返回错误后直接写入 `SandboxDestroyed`，并未调用后端确认清理；`Reconcile` 看到该事实就跳过，部分创建留下的目录可能因此漏清理。
+
+现在把“创建失败”和“清理完成”分开：
+
+1. `Controller.Create` 仍先记录原有 `SandboxInstanceCreated` 事实，再调用后端；这个历史名称不是后端已经就绪的证明。后端失败或返回不匹配的实例 ID 时，`cleanupFailedCreate` 记录 `SandboxCreateFailed`，随后对**请求推导出的实例 ID** 调用 `Destroy`，不对不可信的返回 ID 操作。
+2. `Destroy` 成功才记录 `SandboxDestroyed`。清理失败时返回原始错误与清理错误，保留可重试状态；新建 Controller 读取同一 journal 后，仍能由 `Reconcile` 再次清理。这里的“重建”不等于新建一个 Loopback 后端后自动恢复目录所有权。
+3. 两个状态投影都保留 `CreationFailed` 标记，阻止该代实例继续 `Exec`、重新 `Create` 或通过暂停/恢复绕过失败状态；清理入口仍可用。恢复清理成功后重复 `Reconcile` 不再操作后端。创建新实例应使用新的 generation，而不是复活已销毁的一代。
+4. Loopback 用 `os.Mkdir` 原子创建实例目录，不接管已经存在的文件、目录或符号链接。记录目录归属后创建 `tmp`，全部成功才标记 ready；中途失败立即尝试清理，清理失败则保留归属供 `Destroy` 重试，不能执行任务。`removeOwnedDir` 检查登记与文件身份，拒绝删除无法确认归属的路径。
+
+例如请求推导出实例 A，目录已创建但 `tmp` 初始化失败：如果目录删除成功，控制器确认清理后记录 Destroyed；如果删除失败，则保留 A 的失败标记和目录归属，下一次 Reconcile 重试，成功后再记录 Destroyed。若后端误返回实例 B，清理目标仍只能是 A，不能误删 B。
+
+边界：journal 不可写时会返回记录错误，不吞掉错误或声称失败状态已持久化；这不是 journal 与文件系统的跨系统事务，也没有补齐崩溃时所有中间窗口。Loopback 的目录归属仍只存于当前后端内存，新后端遇到同名已有目录会拒绝接管/删除，需要另行恢复方案。文件身份检查也不构成对恶意并发替换路径的安全隔离。
+
+回退注意：旧控制器不识别新增的 `SandboxCreateFailed`，会忽略这道执行限制。已经写入该事件且尚未完成清理的 journal，不能直接交给旧版本继续执行；应先使用新版完成清理，或隔离备份后使用新的测试 journal。本轮仅操作临时测试库，没有迁移真实用户数据或激活应用；新增事实可被旧代码忽略，不代表可以安全混用版本。
+
 ## CI 与 macOS 的边界
 
 [sandbox-baseline.yml](.github/workflows/sandbox-baseline.yml) 在 main、codex 分支 push 和面向 main 的 PR 上依次运行同一入口的普通模式与 race 模式，两者都必须通过。race 检测会改变执行时序，不能替代普通模式。使用只读 contents 权限、固定 SHA 的 checkout、不持久化 Git 凭据、不注入真实模型密钥、不上传产物。维护者于 2026-10-27 授权仅在 GitHub CI 准备对应 Go 工具链：固定 SHA 的 `actions/setup-go` 从 `go.mod` 读取版本，必要时下载；不追踪 latest、不启用依赖缓存，然后下载锁定的公开 Go 模块。保留 `GOTOOLCHAIN=local`，后续命令不会隐式切换工具链；本机脚本仍离线、不安装 Go。下载失败或版本不满足时明确失败，不降低项目版本要求。CI 运行测试代码本身不等于网络隔离。
