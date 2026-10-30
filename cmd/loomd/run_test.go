@@ -587,16 +587,37 @@ func TestOptionalCredentialImportSourceFailsClosedOnUnsafePath(t *testing.T) {
 	}
 }
 
-func TestExpandLocalAppServiceArgsRejectsMissingRuntime(t *testing.T) {
-	_, err := expandLocalAppServiceArgs(
+func TestQ11ExpandLocalAppServiceArgsWithoutPi(t *testing.T) {
+	args, err := expandLocalAppServiceArgs(
 		[]string{"--local-app-service"},
 		t.TempDir(),
 		nil,
 		"",
 		"",
 	)
-	if err == nil {
-		t.Fatal("missing local runtime was accepted")
+	if err != nil {
+		t.Fatalf("optional Pi blocked base service: %v", err)
+	}
+	if !slices.Contains(args, "--disable-pi") || slices.Contains(args, "--runtime-dir") || slices.Contains(args, "--instance-id") {
+		t.Fatalf("absent Pi must be explicit, not a fabricated runtime: %q", args)
+	}
+}
+
+func TestQ11RunParsesDisabledPiWithoutRuntimeIdentity(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	called := false
+	code := run(context.Background(), []string{
+		"--state", "/tmp/q11/state.db", "--isolation-root", "/tmp/q11/isolation",
+		"--disable-pi", "--interval", "1s", "--process-timeout", "1s",
+	}, &stdout, &stderr, func(config daemonBuildConfig) (daemonRunner, error) {
+		called = true
+		if config.Observer.RuntimeInstanceID != "" || len(config.Observer.RuntimeSearchPaths) != 0 {
+			t.Fatalf("fabricated Pi configuration: %#v", config.Observer)
+		}
+		return &fakeDaemonRunner{}, nil
+	})
+	if code != 0 || !called {
+		t.Fatalf("disabled Pi prevented builder: code=%d stderr=%s", code, &stderr)
 	}
 }
 

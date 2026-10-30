@@ -900,6 +900,27 @@ final class LocalProductStoreTests: XCTestCase {
     XCTAssertEqual(store.connectionState, .online)
   }
 
+  func testQ11PiFailureRemainsDegradedWithPagination() async {
+    let reasons = [
+      "observer_version_timeout", "observer_models_timeout",
+      "observer_version_process", "observer_models_process",
+      "observer_version_output_limit", "observer_models_output_limit",
+      "observer_version_output", "observer_models_output",
+      "observer_version_stderr", "observer_models_stderr", "observer_models_duplicate",
+    ]
+    for reason in reasons {
+      let snapshot = LocalProductSnapshot(
+        viewVersion: "view-1", partial: true, reason: reason,
+        runPage: LocalProductPageCursor(nextCursor: "cursor-2", hasMore: true)
+      )
+      let store = LocalProductStore(
+        client: StubLocalProductClient(snapshots: [.success(snapshot)])
+      )
+      await store.refresh()
+      XCTAssertEqual(store.connectionState, .partial(reason: reason), reason)
+    }
+  }
+
   func testObserverModelsTimeoutKeepsDegradedPartialState() async {
     let snapshot = LocalProductSnapshot(
       viewVersion: "view-1",

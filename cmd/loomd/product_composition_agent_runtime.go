@@ -627,7 +627,8 @@ func newProductAgentRuntimeFactory(
 		}
 		config.ToolExecution = toolExecution
 		materializerRoute := &productSavedTeamMaterialization{
-			store: store, projection: readModel, now: config.Now,
+			disablePi: config.DisablePi,
+			store:     store, projection: readModel, now: config.Now,
 		}
 		if config.LocalModelCatalog != nil {
 			localModel, modelErr := conversationSlot.LocalModelRuntime()

@@ -36,6 +36,20 @@ jobs:
         run: bash scripts/verify-sandbox.sh
       - name: Run account-free baseline with race detection
         run: bash scripts/verify-sandbox.sh --race
+      - name: Run account-free startup regressions
+        run: bash scripts/verify-startup.sh
+      - name: Run account-free startup regressions with race detection
+        run: bash scripts/verify-startup.sh --race
       - name: Ensure dependency locks remain unchanged
         if: always()
         run: git diff --exit-code -- go.mod go.sum
+  startup-ui:
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      # Use the runner's installed Xcode/Swift; no tool or package installation.
+      - name: Check optional-runtime UI state and pagination
+        run: bash scripts/verify-startup-ui.sh

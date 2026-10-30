@@ -445,8 +445,14 @@ func (service *LocalProductReadService) applyRuntimeObservationHealth(
 		}
 		return snapshot, nil
 	}
-	if reason != "observer_version_timeout" &&
-		reason != "observer_models_timeout" {
+	switch reason {
+	case "observer_version_timeout", "observer_models_timeout",
+		"observer_version_process", "observer_models_process",
+		"observer_version_output_limit", "observer_models_output_limit",
+		"observer_version_output", "observer_models_output",
+		"observer_version_stderr", "observer_models_stderr", "observer_models_duplicate":
+		// Only fixed, non-sensitive codes from the Pi metadata classifier.
+	default:
 		return LocalProductSnapshot{}, ErrLocalProductStateUnavailable
 	}
 	snapshot.Partial = true

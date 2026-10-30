@@ -673,6 +673,7 @@ type controlledMissionFixtureManifest struct {
 }
 
 type productSetupRuntimeConfig struct {
+	DisablePi                    bool
 	CodexExecutable              string
 	ClaudeExecutable             string
 	OpenCodeExecutable           string
@@ -705,6 +706,7 @@ type productCredentialAvailability interface {
 }
 
 type productMissionExecutionRuntimeConfig struct {
+	DisablePi               bool
 	RuntimeSearchPaths      []string
 	RuntimeInstanceID       string
 	CodexExecutable         string
@@ -1611,6 +1613,7 @@ type productSavedTeamMaterializer interface {
 }
 
 type productSavedTeamMaterialization struct {
+	disablePi  bool
 	store      *journal.Store
 	projection *projection.Projection
 	now        func() time.Time
@@ -1939,20 +1942,25 @@ func containableProductObserverTimeout(err error) bool {
 	if !containablePiMetadataProcessError(err) {
 		return false
 	}
-	_, ok := uniquePiMetadataFailureCommand(err)
-	return ok && daemonErrorLeavesMatch(
+	command, ok := uniquePiMetadataFailureCommand(err)
+	return ok && piMetadataObserverFailureReason(command, err) != "observer_unknown" && daemonErrorLeavesMatch(
 		err,
 		piadapter.ErrPiMetadataProcessTimeout,
 		piadapter.ErrPiMetadataProcessFailed,
 		piadapter.ErrPiMetadataProcessOutputTooLarge,
+		loomruntime.ErrInvalidPiMetadataOutput,
+		loomruntime.ErrPiMetadataStderr,
+		loomruntime.ErrDuplicatePiRuntimeModel,
 		app.ErrLocalRuntimeObservationDaemonCycle,
 		loomruntime.ErrRuntimeDiscoveryFailed,
 	)
 }
 
 // A local Pi metadata probe is an optional runtime capability. Its process can
-// be unavailable, time out, or exceed its bounded output without taking down
-// the product IPC service. State, credential, and IPC construction failures
+// be unavailable, time out, exceed its bounded output, or return malformed
+// metadata without taking down the product IPC service. Exactly one recognized
+// failure category and one command are required; mixed failures remain fatal.
+// State, credential, binding, and IPC construction failures
 // remain fatal and are intentionally excluded here.
 func containablePiMetadataProcessError(err error) bool {
 	matches := 0
@@ -1960,6 +1968,9 @@ func containablePiMetadataProcessError(err error) bool {
 		piadapter.ErrPiMetadataProcessTimeout,
 		piadapter.ErrPiMetadataProcessFailed,
 		piadapter.ErrPiMetadataProcessOutputTooLarge,
+		loomruntime.ErrInvalidPiMetadataOutput,
+		loomruntime.ErrPiMetadataStderr,
+		loomruntime.ErrDuplicatePiRuntimeModel,
 	} {
 		if errors.Is(err, target) {
 			matches++
@@ -2056,13 +2067,12 @@ func (health *productRuntimeObservationHealth) RuntimeObservationHealth() (
 	return health.reason, health.reason != ""
 }
 
-func (health *productRuntimeObservationHealth) recordTimeout(err error) {
+func (health *productRuntimeObservationHealth) recordFailure(err error) {
 	if health == nil {
 		return
 	}
 	reason := observerFailureReason(err)
-	if reason != "observer_version_timeout" &&
-		reason != "observer_models_timeout" {
+	if !containableProductObserverTimeout(err) {
 		return
 	}
 	health.mu.Lock()
@@ -3843,8 +3853,9 @@ func buildProductMissionExecutionAPI(
 		}
 	}()
 	if ctx == nil || store == nil || readModel == nil || nilProductAssetPort(readService) ||
-		config.RuntimeInstanceID == "" ||
-		len(config.RuntimeSearchPaths) == 0 ||
+		(config.DisablePi && (config.RuntimeInstanceID != "" || len(config.RuntimeSearchPaths) != 0 || config.LocalModelCatalog != nil)) ||
+		(config.RuntimeInstanceID == "") != (len(config.RuntimeSearchPaths) == 0) ||
+		(config.LocalModelCatalog != nil && config.RuntimeInstanceID == "") ||
 		!filepath.IsAbs(statePath) {
 		return nil, nil, app.ErrInvalidMissionExecution
 	}
@@ -5398,6 +5409,7 @@ func buildProductSetupService(
 	catalog, err := productSetupCatalogForView(
 		context.Background(),
 		readModel.GlobalReadView(),
+		config.DisablePi,
 	)
 	if err != nil {
 		return nil, newDaemonBuildFailure("build_setup_runtime", err)
@@ -5481,7 +5493,7 @@ func buildProductSetupService(
 			Projection:                   readModel,
 			Writer:                       writer,
 			Catalog:                      catalog,
-			CatalogSource:                productSetupCatalogSource{},
+			CatalogSource:                productSetupCatalogSource{disablePi: config.DisablePi},
 			Identity:                     productSetupIdentity{},
 			Now:                          func() time.Time { return time.Now().UTC() },
 			NativeAuth:                   productNativeAuthObserver{observer: native},
@@ -5529,20 +5541,21 @@ func buildProductSetupService(
 	return setupAPI, nil
 }
 
-type productSetupCatalogSource struct{}
+type productSetupCatalogSource struct{ disablePi bool }
 
-func (productSetupCatalogSource) CatalogForView(
+func (source productSetupCatalogSource) CatalogForView(
 	ctx context.Context,
 	view projection.GlobalReadView,
 ) (app.LocalProductSetupCatalog, error) {
-	return productSetupCatalogForView(ctx, view)
+	return productSetupCatalogForView(ctx, view, source.disablePi)
 }
 
 func productSetupCatalogForView(
 	ctx context.Context,
 	view projection.GlobalReadView,
+	disabledPi ...bool,
 ) (app.LocalProductSetupCatalog, error) {
-	if ctx == nil {
+	if ctx == nil || len(disabledPi) > 1 {
 		return app.LocalProductSetupCatalog{},
 			errors.New("setup runtime unavailable")
 	}
@@ -5564,6 +5577,11 @@ func productSetupCatalogForView(
 	runtimes, _ := view.RuntimeInstances("", 64)
 	observationsByProbe := make(map[string][]loomruntime.RuntimeObservation)
 	for _, runtime := range runtimes {
+		// Historical observation facts are not current executable availability.
+		// Do not advertise Pi for new selections when this process disabled it.
+		if len(disabledPi) > 0 && disabledPi[0] && runtime.AdapterType == "pi-cli" {
+			continue
+		}
 		status, ok := productSetupRuntimeStatus(runtime.Status)
 		if !ok {
 			continue
@@ -6309,7 +6327,7 @@ func (materializer *productSavedTeamMaterialization) MaterializeConfirmedTeam(
 		record.Status != confirmation.Status {
 		return app.BuilderConfirmation{}, app.ErrInvalidLocalProductSetup
 	}
-	setupCatalog, err := productSetupCatalogForView(ctx, view)
+	setupCatalog, err := productSetupCatalogForView(ctx, view, materializer.disablePi)
 	if err != nil {
 		return app.BuilderConfirmation{}, app.ErrInvalidLocalProductSetup
 	}
@@ -6688,7 +6706,7 @@ func (runner *productDaemonRunner) Run(
 	select {
 	case outcome := <-observerDone:
 		if containableProductObserverTimeout(outcome.err) {
-			runner.health.recordTimeout(outcome.err)
+			runner.health.recordFailure(outcome.err)
 			select {
 			case serverErr := <-serverDone:
 				return outcome.result, classifyProductDaemonFailure(
