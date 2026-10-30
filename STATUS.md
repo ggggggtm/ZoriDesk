@@ -245,6 +245,13 @@ git diff --exit-code -- go.mod go.sum
 - Q11既定范围验收完成；历史记录中的“待审/最新CI待核验”描述的是当时状态，不覆盖本节。自动热恢复、其他CLI任意错误隔离、完整桌面E2E、安装/签名及全仓Go测试未纳入本次完成声明。
 - 下一任务Q12只补具体诊断与脱敏缺口，复用本次11类健康原因码、分页处理和缺工具提示，不重复Q09/Q10/Q11。未来合并仍需单独授权。
 
+## 分支命名规范授权合并：2026-10-30
+
+- 维护者授权复核并合并 `chore/branch-naming`（`85055fb`）。完整4文件差异无阻断问题：新分支统一采用feat/fix/docs/refactor/test/chore/perf加简短主题，不带工具前缀或qxx编号；CI增加对应推送匹配，测试步骤、只读权限、依赖与固定action SHA均未变。
+- [分支CI40998659868](https://github.com/ggggggtm/ZoriDesk/actions/runs/40998659868) 的Linux与macOS作业已实际成功。按本次授权保留历史合入main，合并附带仅更新STATUS/TASKS验收记录；合并提交CI另行核验，不以分支结果替代。
+- 存量7个远端分支已按另一次明确授权通过GitHub原生rename改名，本地跟踪同步，提交SHA全部保持不变；历史记录中的旧名只作当时证据。后续查询使用新名，例如 `fix/optional-runtime-startup`、`fix/sandbox-create-cleanup`、`feat/bounded-execution-output`、`test/sandbox-verification`。
+- 后续定时维护继续Q12的真实诊断缺口，不重复已完成任务；只推送按新规范命名的待审分支，不自动合并main。此次合并不扩大后续授权，调度频率不变。
+
 ## 状态维护约定
 
 - 实现写在分支，不表示已进入 main；待审查和已合并必须区分。
