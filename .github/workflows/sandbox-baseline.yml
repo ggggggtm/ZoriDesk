@@ -2,7 +2,8 @@ name: Sandbox baseline
 
 on:
   push:
-    branches: [main, 'codex/**']
+    # Retain legacy branches while new work uses descriptive type/topic names.
+    branches: [main, 'feat/**', 'fix/**', 'docs/**', 'refactor/**', 'test/**', 'chore/**', 'perf/**', 'codex/**']
   pull_request:
     branches: [main]
 

@@ -49,7 +49,7 @@ Do not preload all plans, logs or archives. Current code and live verification o
 ## Scheduled maintenance
 
 - Follow TASKS.md dependencies and resume unfinished work before selecting one new small item. Multiple runs may be needed for one item; no useful change means no commit.
-- Use codex/ prefixed branches. User-authorized maintenance may push scoped, verified work to this repository's improvement branch for review, but must not automatically merge or push scheduled changes directly to main.
+- Use descriptive `<type>/<short-kebab-case-topic>` branches, with type feat, fix, docs, refactor, test, chore or perf; e.g. `fix/runtime-diagnostics`. Do not add codex/ or queue IDs such as q12 to new branch names. Queue IDs remain in TASKS.md and acceptance records. Preserve historical branch references; do not rename or delete existing branches without separate authorization. User-authorized maintenance may push scoped, verified work to this repository's improvement branch for review, but must not automatically merge or push scheduled changes directly to main.
 - Direct user-requested initialization changes may follow the explicitly approved submission path; that exception does not authorize future automatic main updates.
 - Never write to upstream or another user's repository under this maintenance authorization. Do not automatically sync all upstream changes or modify the personal profile repository.
 - Keep STATUS and TASKS consistent with actual results. A pushed branch is review, not done; done requires acceptance and inclusion in main. Record branch/commit, checks, limitations and next action without exposing sensitive logs.
