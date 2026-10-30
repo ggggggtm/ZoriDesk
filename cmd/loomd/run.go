@@ -147,6 +147,7 @@ func productionDaemonBuilder(
 		config.Observer.StatePath,
 		config.SocketPath,
 		productSetupRuntimeConfig{
+			DisablePi:          config.Observer.DisablePi,
 			CodexExecutable:    config.CodexExecutable,
 			ClaudeExecutable:   config.ClaudeExecutable,
 			OpenCodeExecutable: config.OpenCodeExecutable,
@@ -181,6 +182,7 @@ func missionExecutionConfigFromDaemonBuild(
 	config daemonBuildConfig,
 ) *productMissionExecutionRuntimeConfig {
 	execution := &productMissionExecutionRuntimeConfig{
+		DisablePi: config.Observer.DisablePi,
 		RuntimeSearchPaths: append(
 			[]string(nil),
 			config.Observer.RuntimeSearchPaths...,
@@ -200,6 +202,7 @@ func missionExecutionConfigFromDaemonBuild(
 	// to unenrolled tools; materialization still requires the Agent binding and
 	// Provider Account policy, so this does not grant a global capability.
 	hasRuntimeConfig := execution.RuntimeInstanceID != "" ||
+		(config.Observer.DisablePi && config.SocketPath != "") ||
 		len(execution.RuntimeSearchPaths) > 0 ||
 		execution.LocalModelCatalog != nil ||
 		execution.CodexExecutable != "" ||
@@ -217,7 +220,8 @@ func missionExecutionConfigFromDaemonBuild(
 		execution.CodexExecutable == "" &&
 		execution.ClaudeExecutable == "" &&
 		execution.OpenCodeExecutable == "" &&
-		execution.RemoteToolBroker == nil {
+		execution.RemoteToolBroker == nil &&
+		!(config.Observer.DisablePi && config.SocketPath != "") {
 		return nil
 	}
 	return execution
@@ -251,6 +255,7 @@ func run(
 	fs := flag.NewFlagSet("loomd", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	statePath := fs.String("state", "", "")
+	disablePi := fs.Bool("disable-pi", false, "")
 	isolationRoot := fs.String("isolation-root", "", "")
 	var runtimeDirs repeatedStrings
 	fs.Var(&runtimeDirs, "runtime-dir", "")
@@ -274,11 +279,6 @@ func run(
 	}
 	if *statePath == "" ||
 		*isolationRoot == "" ||
-		len(runtimeDirs) == 0 ||
-		*probeID == "" ||
-		*instanceID == "" ||
-		*deviceID == "" ||
-		*displayName == "" ||
 		*interval <= 0 ||
 		*processTimeout <= 0 {
 		return writeDaemonError(stderr, exitInvalidInput, "invalid input")
@@ -296,6 +296,15 @@ func run(
 	if localModelValues != 0 && localModelValues != 3 {
 		return writeDaemonError(stderr, exitInvalidInput, "invalid input")
 	}
+	if *disablePi {
+		if len(runtimeDirs) != 0 || *probeID != "" || *instanceID != "" ||
+			*deviceID != "" || *displayName != "" || localModelValues != 0 {
+			return writeDaemonError(stderr, exitInvalidInput, "invalid input")
+		}
+	} else if len(runtimeDirs) == 0 || *probeID == "" || *instanceID == "" ||
+		*deviceID == "" || *displayName == "" {
+		return writeDaemonError(stderr, exitInvalidInput, "invalid input")
+	}
 	var localModelCatalog *piadapter.PiLocalModelCatalogConfig
 	if localModelValues == 3 {
 		localModelCatalog = &piadapter.PiLocalModelCatalogConfig{
@@ -307,6 +316,7 @@ func run(
 
 	config := daemonBuildConfig{
 		Observer: app.LocalRuntimeObservationDaemonConfig{
+			DisablePi:           *disablePi,
 			StatePath:           *statePath,
 			IsolationRoot:       *isolationRoot,
 			RuntimeSearchPaths:  append([]string(nil), runtimeDirs...),

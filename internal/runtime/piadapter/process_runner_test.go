@@ -617,7 +617,13 @@ validate_environment() {
 	[ "$PI_TELEMETRY" = 0 ] || return 1
 	for path in "$HOME" "$TMPDIR" "$PI_CODING_AGENT_DIR" "$PI_CODING_AGENT_SESSION_DIR"; do
 		[ -d "$path" ] || return 1
-		mode_value=$(/usr/bin/stat -f '%%Lp' "$path" 2>/dev/null || /usr/bin/stat -c '%%a' "$path" 2>/dev/null)
+		# GNU stat -f may print filesystem data before failing on the BSD format.
+		# Keep only the successful implementation's output, not both outputs.
+		if mode_value=$(/usr/bin/stat -f '%%Lp' "$path" 2>/dev/null); then
+			:
+		else
+			mode_value=$(/usr/bin/stat -c '%%a' "$path" 2>/dev/null) || return 1
+		fi
 		[ "$mode_value" = 700 ] || return 1
 	done
 	/usr/bin/env | while IFS='=' read -r key value; do
@@ -631,7 +637,11 @@ validate_environment() {
 validate_catalog() {
 	models_path="$PI_CODING_AGENT_DIR/models.json"
 	[ -f "$models_path" ] || return 1
-	mode_value=$(/usr/bin/stat -f '%%Lp' "$models_path" 2>/dev/null || /usr/bin/stat -c '%%a' "$models_path" 2>/dev/null)
+	if mode_value=$(/usr/bin/stat -f '%%Lp' "$models_path" 2>/dev/null); then
+		:
+	else
+		mode_value=$(/usr/bin/stat -c '%%a' "$models_path" 2>/dev/null) || return 1
+	fi
 	[ "$mode_value" = 600 ] || return 1
 	/usr/bin/cmp -s "$models_path" "$fixture_dir/expected-models-json"
 }

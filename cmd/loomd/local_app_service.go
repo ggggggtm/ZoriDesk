@@ -2,12 +2,14 @@ package main
 
 import (
 	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"loom-pi-rebuild/internal/runtime/harnessadapter"
 )
@@ -131,8 +133,23 @@ func localAppServiceArgs() ([]string, error) {
 	if err != nil || !filepath.IsAbs(home) {
 		return nil, errors.New("local app home unavailable")
 	}
+	return localAppServiceArgsForHome(home, exec.LookPath, os.Stderr)
+}
+
+// Only auto-discovered optional tools are degraded here. Explicit daemon flags
+// and shared state/storage validation remain fail-closed.
+func localAppServiceArgsForHome(home string, lookup func(string) (string, error), warnings io.Writer) ([]string, error) {
+	if !filepath.IsAbs(home) || filepath.Clean(home) != home || lookup == nil || warnings == nil {
+		return nil, errors.New("invalid local app environment")
+	}
 	appSupport := filepath.Join(home, "Library", "Application Support", "Loom")
+	for _, directory := range []string{home, filepath.Join(home, "Library"), filepath.Join(home, "Library", "Application Support")} {
+		if err := ensureLocalAppParentDirectory(directory); err != nil {
+			return nil, errors.New("local app parent directory unavailable")
+		}
+	}
 	for _, directory := range []string{
+		appSupport,
 		filepath.Join(appSupport, "state"),
 		filepath.Join(appSupport, "isolation"),
 		filepath.Join(appSupport, "run"),
@@ -143,18 +160,24 @@ func localAppServiceArgs() ([]string, error) {
 	}
 	runtimeDirs, err := installedLocalAppRuntimeDirs(home)
 	if err != nil {
-		return nil, err
-	}
-	for _, executable := range []string{"node"} {
-		path, lookupErr := exec.LookPath(executable)
-		if lookupErr != nil {
-			return nil, errors.New("local app runtime dependency unavailable")
+		_, _ = io.WriteString(warnings, "Pi unavailable: install or repair the optional Pi runtime and restart; other configured backends remain available.\n")
+		runtimeDirs = nil
+	} else {
+		piInfo, piErr := os.Stat(filepath.Join(runtimeDirs[0], "pi"))
+		nodePath, nodeErr := lookup("node")
+		if piErr != nil || !piInfo.Mode().IsRegular() || piInfo.Mode().Perm()&0o111 == 0 {
+			_, _ = io.WriteString(warnings, "Pi unavailable: repair the optional Pi executable and restart; other configured backends remain available.\n")
+			runtimeDirs = nil
+		} else if nodeErr != nil || !validLocalAppExecutable(nodePath) {
+			_, _ = io.WriteString(warnings, "Pi unavailable: make Node available to the app service and restart; other configured backends remain available.\n")
+			runtimeDirs = nil
+		} else {
+			runtimeDirs = appendUniqueCleanDir(runtimeDirs, filepath.Dir(nodePath))
 		}
-		runtimeDirs = appendUniqueCleanDir(runtimeDirs, filepath.Dir(path))
 	}
-	codexPath, _ := exec.LookPath("codex")
-	opencodePath, _ := exec.LookPath("opencode")
-	claudePath, _ := exec.LookPath("claude")
+	codexPath, _ := lookup("codex")
+	opencodePath, _ := lookup("opencode")
+	claudePath, _ := lookup("claude")
 	if resolved, resolveErr := harnessadapter.ResolveHarnessExecutable(claudePath); resolveErr == nil {
 		claudePath = resolved
 	} else {
@@ -163,6 +186,33 @@ func localAppServiceArgs() ([]string, error) {
 	return expandLocalAppServiceArgs(
 		[]string{localAppServiceFlag}, home, runtimeDirs, codexPath, opencodePath, claudePath,
 	)
+}
+
+func ensureLocalAppParentDirectory(path string) error {
+	if err := os.Mkdir(path, 0o700); err != nil && !errors.Is(err, os.ErrExist) {
+		return err
+	}
+	canonical, err := filepath.EvalSymlinks(path)
+	if err != nil || canonical != path {
+		return errors.New("invalid local app parent")
+	}
+	info, err := os.Lstat(path)
+	if err != nil || !info.IsDir() || info.Mode().Perm()&0o022 != 0 {
+		return errors.New("invalid local app parent")
+	}
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if !ok || int(stat.Uid) != os.Geteuid() {
+		return errors.New("invalid local app parent")
+	}
+	return nil
+}
+
+func validLocalAppExecutable(path string) bool {
+	if !filepath.IsAbs(path) || filepath.Clean(path) != path {
+		return false
+	}
+	info, err := os.Stat(path)
+	return err == nil && info.Mode().IsRegular() && info.Mode().Perm()&0o111 != 0
 }
 
 func parseLocalAppServiceParentPID(args []string) (int, error) {
@@ -219,12 +269,16 @@ func expandLocalAppServiceArgs(
 	harnessExecutables ...string,
 ) ([]string, error) {
 	if len(args) != 1 || args[0] != localAppServiceFlag ||
-		!filepath.IsAbs(home) || len(runtimeDirs) == 0 {
+		!filepath.IsAbs(home) || filepath.Clean(home) != home {
 		return nil, errors.New("invalid local app service input")
 	}
-	version, ok := localAppRuntimeVersion(home, runtimeDirs[0])
-	if !ok {
-		return nil, errors.New("invalid local app runtime")
+	var version string
+	if len(runtimeDirs) > 0 {
+		var ok bool
+		version, ok = localAppRuntimeVersion(home, runtimeDirs[0])
+		if !ok {
+			return nil, errors.New("invalid local app runtime")
+		}
 	}
 	for _, directory := range runtimeDirs {
 		if !filepath.IsAbs(directory) || filepath.Clean(directory) != directory {
@@ -243,11 +297,17 @@ func expandLocalAppServiceArgs(
 	for _, directory := range runtimeDirs {
 		expanded = append(expanded, "--runtime-dir", directory)
 	}
+	if version == "" {
+		expanded = append(expanded, "--disable-pi")
+	} else {
+		expanded = append(expanded,
+			"--probe-id", "probe.pi.local-app",
+			"--instance-id", "runtime.pi.earendil-works."+version,
+			"--device-id", "device.local",
+			"--display-name", "Pi "+version,
+		)
+	}
 	expanded = append(expanded,
-		"--probe-id", "probe.pi.local-app",
-		"--instance-id", "runtime.pi.earendil-works."+version,
-		"--device-id", "device.local",
-		"--display-name", "Pi "+version,
 		"--interval", "10s",
 		"--process-timeout", "10s",
 		"--socket", filepath.Join(appSupport, "run", "loomd.sock"),

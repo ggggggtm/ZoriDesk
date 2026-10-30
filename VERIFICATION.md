@@ -1,6 +1,6 @@
-# 无账号的 Sandbox 验证入口
+# 无账号的 Sandbox 与启动验证入口
 
-状态：Q05 的首个有界切片，尚未代表完整应用通过验收。运行结果见 [STATUS.md](STATUS.md)，任务依赖见 [TASKS.md](TASKS.md)。
+状态：Q05/Q09/Q10 的有界 Sandbox 验证与 Q11 启动回归，不代表完整应用通过验收。运行结果见 [STATUS.md](STATUS.md)，任务依赖见 [TASKS.md](TASKS.md)。
 
 ## 怎么运行
 
@@ -87,10 +87,50 @@ Q10 整项状态：2026-10-29 已对照原定验收关闭为 done，验收矩阵
 
 回退注意：旧控制器不识别新增的 `SandboxCreateFailed`，会忽略这道执行限制。已经写入该事件且尚未完成清理的 journal，不能直接交给旧版本继续执行；应先使用新版完成清理，或隔离备份后使用新的测试 journal。本轮仅操作临时测试库，没有迁移真实用户数据或激活应用；新增事实可被旧代码忽略，不代表可以安全混用版本。
 
+## Q11：可选 Pi 与启动解耦
+
+2026-10-30：分支`3516dad`经独立复核，按维护者授权合入main。分支CI40996224960的Linux Sandbox普通/race各107条、启动普通/race各449条记录及macOS六项XCTest均通过、无跳过；合并提交CI另行核验，状态见STATUS。以下是当前实现与覆盖边界，不代表真实模型或完整桌面E2E已通过。
+
+原来底层探测支持“没有找到 Pi”，但桌面入口先要求 Pi 安装目录与 Node 存在；参数解析、观察服务和执行服务装配又要求 Pi 搜索路径/实例 ID。结果是不使用 Pi 的用户也无法走完整启动链路。Q11 修复这条装配链，复用已有探测、原生适配器和权限机制，不重写 Q09/Q10。
+
+```text
+桌面启动 → localAppServiceArgsForHome
+  ├─ Pi + Node 可用 → 保留原 Pi 参数、探测工厂与按需执行
+  └─ Pi 缺失/不可执行或 Node 缺失 → 固定安全提示 + --disable-pi
+       ↓
+run 校验公共参数与互斥配置 → productionDaemonBuilder
+       ↓
+真实状态库/锁/IPC + 不含 Pi 的观察器 + 其他已配置后端
+```
+
+1. **公共资源不是可选的。**全新用户目录按层建立应用私有目录；已有目录不改权限。共享目录必须满足真实路径、类型、所有者和权限要求。目录或数据库异常仍失败，不能因为 Pi 可选而绕过安全校验。
+2. **显式缺省，而非伪装配置。**`--disable-pi` 对应 `LocalRuntimeObservationDaemonConfig.DisablePi`，禁止同时传 Pi ID、搜索路径或本地模型目录。观察器保留真实 SQLite、锁、周期与退出处理，但不构造 Pi 工厂。空观察不会把其他后端改为离线，也不写伪造的 Pi 在线事实。
+3. **其他后端仍走原授权路径。**`missionExecutionConfigFromDaemonBuild` 保留无 Pi 的产品执行装配；`buildProductMissionExecutionAPI` 不再要求无关 Pi 信息，仍拒绝半套或互相矛盾的配置。保留原有 EnrollmentOnly 工具接入，使用工具仍需账号策略和显式授权；没有安装依赖、自动选模型或扩大权限。
+4. **历史事实不等于当前可用。**禁用 Pi 时，设置初始目录、刷新目录和已保存团队的重新绑定不再提供 Pi 候选；journal 不重写，原始历史视图仍可包含旧 Pi 记录。旧任务的执行仍需匹配可用适配器，不自动切到其他后端；历史预检不是现场执行证明。
+5. **可选探测错误与系统错误分开。**沿用已有的 Pi 进程失败/超时/输出限额处理，补充格式错误、stderr 和重复模型等明确元数据错误；只有一个已知失败类别、唯一的版本/模型查询命令及允许的错误链才能保留 IPC。绑定变化、数据库、日志写入、未知清理错误或混合错误仍失败。后台上报固定原因码，不透出原始模型输出、凭据或用户路径。
+6. **降级状态贯通到界面。**`recordFailure` 保存固定原因码，`applyRuntimeObservationHealth` 只接受对应 11 种码，Swift `closedReason` 与 `isUserVisibleDegradation` 保持同一集合。即使同时有“下一页”，探测异常也不能被误报为正常；只有正常分页仍显示在线。未知服务原因码不能绕过 API 校验。
+
+例如全新机器没有 Pi/Node，但已配置另一个后端：桌面生成真实状态/连接路径和 `--disable-pi`，设置页能够读取，其他后端仍按原凭证与权限规则装配。若之后安装 Pi，需要重启服务重新发现；本次不是热插拔或自动安装。若共享状态目录被替换为符号链接，启动仍拒绝，不能降级为忽略该目录。
+
+### 如何验证与哪些未验证
+
+```sh
+bash scripts/verify-startup.sh
+bash scripts/verify-startup.sh --race
+# 需要包含 XCTest 的 macOS 开发环境；Linux 不运行此入口。
+bash scripts/verify-startup-ui.sh
+```
+
+[verify-startup.sh](scripts/verify-startup.sh) 先检查格式、锁定依赖、目标包编译和 vet，再执行固定的无账号回归集合并用原 `testreport` 校验器拒绝 skip/空包/未完成测试。覆盖首次启动组合、互斥参数、共享目录保护、实际服务构造到本地 IPC、原生适配器装配、历史 Pi 候选过滤、空观察重启及错误分类；测试使用临时库、测试工具脚本和假凭证，不调用真实模型。
+
+[verify-startup-ui.sh](scripts/verify-startup-ui.sh) 固定执行 6 项 XCTest：11 种 Pi 原因码与分页同时存在、正常分页、原超时降级。逐项要求实际通过记录，拒绝跳过和空选；它使用假客户端，不启动真实后端或图形界面。`MissionWorkbench` 的长表达式只做等价分段以解除编译器类型推断瓶颈。
+
+范围：Pi/Node 的启动耦合，不承诺任意第三方 CLI 错误均互不影响。显式错误配置仍拒绝；其他工具自己的依赖仍需满足。缺少 Pi/Node 的操作建议写入现有 daemon 控制台日志，不声称已新增 UI 安装向导。SwiftPM 应用编译已在本机通过，XCTest 的实际运行环境与结果见 STATUS；桌面操作、安装/签名/迁移、真实账号/E2E、工具修复后的自动热恢复未验证。原有 Sandbox 107 条回归不能替代本节的启动验证。
+
 ## CI 与 macOS 的边界
 
 [sandbox-baseline.yml](.github/workflows/sandbox-baseline.yml) 在 main、codex 分支 push 和面向 main 的 PR 上依次运行同一入口的普通模式与 race 模式，两者都必须通过。race 检测会改变执行时序，不能替代普通模式。使用只读 contents 权限、固定 SHA 的 checkout、不持久化 Git 凭据、不注入真实模型密钥、不上传产物。维护者于 2026-10-27 授权仅在 GitHub CI 准备对应 Go 工具链：固定 SHA 的 `actions/setup-go` 从 `go.mod` 读取版本，必要时下载；不追踪 latest、不启用依赖缓存，然后下载锁定的公开 Go 模块。保留 `GOTOOLCHAIN=local`，后续命令不会隐式切换工具链；本机脚本仍离线、不安装 Go。下载失败或版本不满足时明确失败，不降低项目版本要求。CI 运行测试代码本身不等于网络隔离。
 
-工作流文件存在不等于 Actions 已运行。未启用、需审批或缺少 runner 条件时，先记录事实并请求处理，不自动更改仓库权限或 Actions 设置。
+Q11 在同一工作流继续运行 `verify-startup.sh` 的普通/race 两种模式，原 Sandbox 两步保留；独立 `macos-15` 作业使用 runner 已有 Swift/Xcode 执行 `verify-startup-ui.sh`，不安装工具、不添加外部 Swift 包。两个作业都需成功。工作流文件存在不等于 Actions 已运行。未启用、需审批或缺少 runner 条件时，先记录事实并请求处理，不自动更改仓库权限或 Actions 设置。
 
 macOS 的 `swift package --package-path apps/macos dump-package` 仍是独立的清单检查，不放进 Linux 作业，也不称作应用构建。继承的 build/install/live 脚本涉及应用构建、签名、服务启动或真实运行环境，未经核对不串入本入口。

@@ -58,6 +58,9 @@ var (
 )
 
 type LocalRuntimeObservationDaemonConfig struct {
+	// DisablePi keeps shared state/IPC available without inventing a Pi runtime.
+	// It must not be combined with Pi-specific configuration.
+	DisablePi           bool
 	StatePath           string
 	IsolationRoot       string
 	RuntimeSearchPaths  []string
@@ -176,20 +179,24 @@ func NewLocalRuntimeObservationDaemon(
 		return nil, ErrInvalidLocalRuntimeObservationDaemon
 	}
 
-	factory, err := piadapter.NewPiLocalRuntimeProbeFactory(
-		piadapter.PiLocalRuntimeProbeFactoryConfig{
-			ProbeID:            config.ProbeID,
-			InstanceID:         config.RuntimeInstanceID,
-			DeviceID:           config.DeviceID,
-			DisplayName:        config.DisplayName,
-			IsolationRoot:      config.IsolationRoot,
-			RuntimeSearchPaths: config.RuntimeSearchPaths,
-			Timeout:            config.ProcessTimeout,
-			LocalModelCatalog:  config.LocalModelCatalog,
-		},
-	)
-	if err != nil {
-		return nil, ErrInvalidLocalRuntimeObservationDaemon
+	var factories []discoveryscan.ProbeFactory
+	if !config.DisablePi {
+		factory, err := piadapter.NewPiLocalRuntimeProbeFactory(
+			piadapter.PiLocalRuntimeProbeFactoryConfig{
+				ProbeID:            config.ProbeID,
+				InstanceID:         config.RuntimeInstanceID,
+				DeviceID:           config.DeviceID,
+				DisplayName:        config.DisplayName,
+				IsolationRoot:      config.IsolationRoot,
+				RuntimeSearchPaths: config.RuntimeSearchPaths,
+				Timeout:            config.ProcessTimeout,
+				LocalModelCatalog:  config.LocalModelCatalog,
+			},
+		)
+		if err != nil {
+			return nil, ErrInvalidLocalRuntimeObservationDaemon
+		}
+		factories = append(factories, factory)
 	}
 
 	lock, err := acquireRuntimeDaemonStateLock(config.StatePath + ".lock")
@@ -242,7 +249,7 @@ func NewLocalRuntimeObservationDaemon(
 		return nil, ErrInvalidLocalRuntimeObservationDaemon
 	}
 	observer, err := NewPreparedProjectedRuntimeObserver(
-		[]discoveryscan.ProbeFactory{factory},
+		factories,
 		readModel,
 		discoveryCommitter,
 		statusCommitter,
@@ -583,21 +590,26 @@ func validRuntimeObservationIdentity(value string) bool {
 func validateLocalRuntimeObservationDaemonConfig(
 	input LocalRuntimeObservationDaemonConfig,
 ) (LocalRuntimeObservationDaemonConfig, error) {
-	if input.ProbeID == "" ||
-		input.RuntimeInstanceID == "" ||
-		input.DeviceID == "" ||
-		input.DisplayName == "" ||
-		input.ObservationInterval < minRuntimeObservationInterval ||
+	if input.ObservationInterval < minRuntimeObservationInterval ||
 		input.ObservationInterval > maxRuntimeObservationInterval ||
 		input.ProcessTimeout <= 0 ||
 		input.ProcessTimeout > maxRuntimeObservationTimeout ||
 		input.MaxCycles < 0 ||
 		input.MaxCycles > maxRuntimeObservationCycles ||
 		!validRuntimeDaemonPath(input.StatePath) ||
-		!validRuntimeDaemonPath(input.IsolationRoot) ||
-		len(input.RuntimeSearchPaths) == 0 {
+		!validRuntimeDaemonPath(input.IsolationRoot) {
 		return LocalRuntimeObservationDaemonConfig{},
 			ErrInvalidLocalRuntimeObservationDaemon
+	}
+	if input.DisablePi {
+		if input.ProbeID != "" || input.RuntimeInstanceID != "" ||
+			input.DeviceID != "" || input.DisplayName != "" ||
+			len(input.RuntimeSearchPaths) != 0 || input.LocalModelCatalog != nil {
+			return LocalRuntimeObservationDaemonConfig{}, ErrInvalidLocalRuntimeObservationDaemon
+		}
+	} else if input.ProbeID == "" || input.RuntimeInstanceID == "" ||
+		input.DeviceID == "" || input.DisplayName == "" || len(input.RuntimeSearchPaths) == 0 {
+		return LocalRuntimeObservationDaemonConfig{}, ErrInvalidLocalRuntimeObservationDaemon
 	}
 	parent := filepath.Dir(input.StatePath)
 	if !validPrivateRuntimeDaemonDirectory(parent) ||

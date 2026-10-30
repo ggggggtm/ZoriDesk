@@ -3065,7 +3065,9 @@ public struct MissionWorkbench: View {
     )
   }
 
-  public var body: some View {
+  // Keep each expression small enough for Swift's type checker; the modifier
+  // order and view hierarchy are unchanged.
+  private var workbenchLayout: some View {
     HSplitView {
       if showRail {
         workbenchRail
@@ -3094,6 +3096,10 @@ public struct MissionWorkbench: View {
       }
     }
     .background(LoomGraphite.canvas)
+  }
+
+  private var credentialDialogs: some View {
+    workbenchLayout
     .sheet(isPresented: $showProviders) {
       providerManagement
         .frame(minWidth: 720, minHeight: 620)
@@ -3149,6 +3155,10 @@ public struct MissionWorkbench: View {
         )
       }
     }
+  }
+
+  private var recoveryDialogs: some View {
+    credentialDialogs
     .confirmationDialog(
       "Authorize Agent recovery?",
       isPresented: Binding(
@@ -3200,6 +3210,10 @@ public struct MissionWorkbench: View {
         Text(missionToolRecoveryConfirmationDetail(pending.action))
       }
     }
+  }
+
+  private var missionSheets: some View {
+    recoveryDialogs
     .sheet(isPresented: $showNewMission) {
       newMissionSheet
         .frame(minWidth: 660, minHeight: 640)
@@ -3259,6 +3273,10 @@ public struct MissionWorkbench: View {
       )
       .frame(minWidth: 620, idealWidth: 680, minHeight: 520)
     }
+  }
+
+  public var body: some View {
+    missionSheets
     .accessibilityElement(children: .contain)
     .accessibilityLabel(
       showRail

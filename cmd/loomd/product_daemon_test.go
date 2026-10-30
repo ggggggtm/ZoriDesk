@@ -12248,7 +12248,7 @@ func TestProductCodexConversationAuthMapsToActionableError(t *testing.T) {
 	}
 }
 
-func TestProductMissionExecutionCompositionBuildsBrokeredOnlyWithoutLocalModel(
+func TestQ11ProductMissionExecutionBuildsWithoutPiConfiguration(
 	t *testing.T,
 ) {
 	_, statePath := productDaemonFailureState(t)
@@ -12273,6 +12273,20 @@ func TestProductMissionExecutionCompositionBuildsBrokeredOnlyWithoutLocalModel(
 	if err != nil {
 		t.Fatal(err)
 	}
+	for _, invalid := range []productMissionExecutionRuntimeConfig{
+		{DisablePi: true, RuntimeInstanceID: "pi", RuntimeSearchPaths: []string{t.TempDir()}},
+		{DisablePi: true, LocalModelCatalog: &piadapter.PiLocalModelCatalogConfig{}},
+		{RuntimeInstanceID: "partial"},
+		{RuntimeSearchPaths: []string{t.TempDir()}},
+	} {
+		api, closer, err := buildProductMissionExecutionAPI(context.Background(), store, readModel, readService, statePath, invalid)
+		if closer != nil {
+			_ = closer.Close()
+		}
+		if err == nil || api != nil {
+			t.Fatal("mixed or partial Pi execution configuration accepted")
+		}
+	}
 	executionAPI, closer, err := buildProductMissionExecutionAPI(
 		context.Background(),
 		store,
@@ -12280,8 +12294,9 @@ func TestProductMissionExecutionCompositionBuildsBrokeredOnlyWithoutLocalModel(
 		readService,
 		statePath,
 		productMissionExecutionRuntimeConfig{
-			RuntimeSearchPaths: []string{t.TempDir()},
-			RuntimeInstanceID:  "runtime-1",
+			DisablePi:        true,
+			CredentialLeases: &productAgentCredentialLeaseFixture{},
+			Diagnostics:      &productHarnessAgentDiagnosticFixture{},
 			Now: func() time.Time {
 				return time.Date(2026, 8, 1, 10, 5, 0, 0, time.UTC)
 			},
@@ -12291,6 +12306,11 @@ func TestProductMissionExecutionCompositionBuildsBrokeredOnlyWithoutLocalModel(
 		t.Fatalf("brokered-only execution API construction failed: %v", err)
 	}
 	defer closer.Close()
+	for _, id := range []string{productNativeAgentRuntimeInstanceID, productKimiAgentRuntimeInstanceID, productMiniMaxAgentRuntimeInstanceID} {
+		if _, ok := readModel.GlobalReadView().RuntimeInstance(id); !ok {
+			t.Fatalf("native runtime %s lost without Pi", id)
+		}
+	}
 	workPackage, err := work.CodingWorkPackage()
 	if err != nil {
 		t.Fatal(err)
