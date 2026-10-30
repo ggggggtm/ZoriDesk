@@ -1,6 +1,6 @@
 # 无账号的 Sandbox 与启动验证入口
 
-状态：Q05/Q09/Q10 的有界 Sandbox 验证与 Q11 启动回归，不代表完整应用通过验收。运行结果见 [STATUS.md](STATUS.md)，任务依赖见 [TASKS.md](TASKS.md)。
+状态：Q05/Q09/Q10 的有界 Sandbox 验证、Q11 启动回归与 Q12 启动诊断脱敏切片，不代表完整应用通过验收。运行结果见 [STATUS.md](STATUS.md)，任务依赖见 [TASKS.md](TASKS.md)。
 
 ## 怎么运行
 
@@ -129,8 +129,22 @@ bash scripts/verify-startup-ui.sh
 
 ## CI 与 macOS 的边界
 
-[sandbox-baseline.yml](.github/workflows/sandbox-baseline.yml) 在 main、codex 分支 push 和面向 main 的 PR 上依次运行同一入口的普通模式与 race 模式，两者都必须通过。race 检测会改变执行时序，不能替代普通模式。使用只读 contents 权限、固定 SHA 的 checkout、不持久化 Git 凭据、不注入真实模型密钥、不上传产物。维护者于 2026-10-27 授权仅在 GitHub CI 准备对应 Go 工具链：固定 SHA 的 `actions/setup-go` 从 `go.mod` 读取版本，必要时下载；不追踪 latest、不启用依赖缓存，然后下载锁定的公开 Go 模块。保留 `GOTOOLCHAIN=local`，后续命令不会隐式切换工具链；本机脚本仍离线、不安装 Go。下载失败或版本不满足时明确失败，不降低项目版本要求。CI 运行测试代码本身不等于网络隔离。
+[sandbox-baseline.yml](.github/workflows/sandbox-baseline.yml) 在 main、feat/fix/docs/refactor/test/chore/perf 类型分支 push 和面向 main 的 PR 上运行同一入口的普通模式与 race 模式，兼容历史 codex 分支，两种模式都必须通过。race 检测会改变执行时序，不能替代普通模式。使用只读 contents 权限、固定 SHA 的 checkout、不持久化 Git 凭据、不注入真实模型密钥、不上传产物。维护者于 2026-10-27 授权仅在 GitHub CI 准备对应 Go 工具链：固定 SHA 的 `actions/setup-go` 从 `go.mod` 读取版本，必要时下载；不追踪 latest、不启用依赖缓存，然后下载锁定的公开 Go 模块。保留 `GOTOOLCHAIN=local`，后续命令不会隐式切换工具链；本机脚本仍离线、不安装 Go。下载失败或版本不满足时明确失败，不降低项目版本要求。CI 运行测试代码本身不等于网络隔离。
 
 Q11 在同一工作流继续运行 `verify-startup.sh` 的普通/race 两种模式，原 Sandbox 两步保留；独立 `macos-15` 作业使用 runner 已有 Swift/Xcode 执行 `verify-startup-ui.sh`，不安装工具、不添加外部 Swift 包。两个作业都需成功。工作流文件存在不等于 Actions 已运行。未启用、需审批或缺少 runner 条件时，先记录事实并请求处理，不自动更改仓库权限或 Actions 设置。
 
 macOS 的 `swift package --package-path apps/macos dump-package` 仍是独立的清单检查，不放进 Linux 作业，也不称作应用构建。继承的 build/install/live 脚本涉及应用构建、签名、服务启动或真实运行环境，未经核对不串入本入口。
+
+## Q12：调试开关也不能输出原始错误
+
+既有实现已提供固定启动/运行原因码、凭证与配置修复建议、结构化运维诊断及导出字段过滤。本切片不重做这些能力，也不改变Q11的11类Pi健康原因码或Q10取消/超时语义。
+
+真实缺口在[run.go](cmd/loomd/run.go)的builder失败路径：默认只返回`daemon unavailable: <固定原因码>`，但`LOOM_DEBUG_DAEMON=1`额外用`%#v`打印原始错误对象，错误文本或字段可能含用户路径、环境配置及授权值。这些日志还可能被桌面进程宿主收集，因此不能以“仅调试模式”为脱敏例外。
+
+修复方式是移除原始对象日志分支，不用正则猜测哪些字符串像密钥。错误仍经原`daemonBuildFailureReason`映射为固定原因；非法或冲突分类保持`build_unknown`，退出码不变。调试开关不再为此构建失败路径提供原文详情，不新增字段、不改状态事实、凭证访问、授权或模型装配。
+
+例如已由构建层归类为`build_state`的错误包含虚构的`Authorization`值和私人路径：无论调试开关是否开启，外部仍只能看到`daemon unavailable: build_state`；这表示定位到状态初始化阶段，不代表已经确定具体文件或认证原因。未知错误不能凭文本猜成认证失败，修复建议仍由已有明确分类链路给出。
+
+[run_test.go](cmd/loomd/run_test.go)的`TestRunDebugBuildFailureDoesNotDiscloseDetails`与`TestRunDebugBuildFailurePreservesAllClosedReasons`覆盖普通/字段/包装/Join错误、非法与冲突原因、nil daemon、三种开关值和14类固定构建原因；严格断言stdout为空、退出码和stderr单行输出不变。另验证不调用未知错误的Error/GoString/Format，不在失败输出中打印原始内容。先在旧实现复现失败，再修复。
+
+新增测试属于既有`TestRun.*`选择集合，直接通过`verify-startup.sh`普通/race进入现有CI，不增加平行脚本或跳过测试。测试只注入虚构错误，不读取真实凭据、不调用模型。范围仅为daemon构建失败日志，不宣称已审计整个应用的所有日志/界面路径；Q12整体验收仍需检查剩余真实缺口，分支交付不记done。
