@@ -16,8 +16,8 @@
 | --- | --- |
 | 公开仓库初始化 | 已完成；保留上游代码和历史，使用 ZoriDesk 名称 |
 | 项目介绍 | 已发布 README，提交 510fdc956d74e533eb6b43551e1fffc3d10d24ef |
-| 运行时代码 | Q05、Q09、Q10 已验收；Q11 可选 Pi/Node 与启动解耦于 2026-10-30 经授权复核合入 main，下项 Q12 |
-| 构建、测试、端到端验证 | Q11 分支 3516dad 的 CI40996224960：Linux Sandbox 普通/race各107条、启动普通/race各449条，macOS六项XCTest通过且无跳过；本地Swift编译通过。合并提交CI另行核验，完整桌面操作、安装及真实模型E2E和全仓Go测试未验证 |
+| 运行时代码 | Q05、Q09、Q10、Q11已验收合入main；Q12启动诊断脱敏切片于2026-10-30经明确授权复核合并，整项仍in_progress，继续核验其余输出路径 |
+| 构建、测试、端到端验证 | Q12分支052ad2e的CI41001765215实际成功：Sandbox普通/race各107条、启动各498条、macOS六项无跳过；合并提交CI另行核验。完整桌面操作、安装、真实模型E2E及全仓Go测试未验证 |
 | 应用与服务内部名称 | 仍有 Loom / loomd 等既有标识，尚未完成品牌迁移 |
 | 本地开发与提交环境 | 已建立独立 checkout；SSH 认证到正确所有者，仓库级个人提交身份已配置；Q00 记录已真实推送并核对远端 SHA |
 | Docker / Kubernetes 后端 | 后续规划，不能写成已交付能力 |
@@ -34,7 +34,7 @@
 ## 下一步
 
 1. Q00、Q03 经复核并按维护者明确授权合入 main，状态 done；不重复初始化或创建模板。此授权仅针对这两个任务，不改变以后定时维护的分支审查规则。
-2. Q05、Q09、Q10、Q11 均已验收，不再重复实现；Q11 的本次授权合并仍须确认合并提交 CI。下一次维护推进 Q12：先核对已有诊断、固定原因码和修复建议，只补真实缺口；后续仍只提交待审分支，不自动合并。
+2. Q05、Q09、Q10、Q11及分支命名规则均已验收，不再重复实现。Q12的启动日志切片已按明确授权复核合并，合并CI须单独确认；下一次先定向复现`roundtableErrorMessage`非远端错误原文展示路径，再补有证据的缺口。不重新开发调试日志修复、不把Q12标done；后续使用类型/主题分支待审，不自动合并。
 3. Q04 随代码和测试同步补充真实路径与关键函数，不阻塞 Q05/Q09；品牌与兼容性任务后置，原有验收、安全边界和分支审查规则保持不变。
 4. 执行前检查实际分支、未提交改动和待审查工作；有未完成任务先收尾，不机械开始新任务。
 
@@ -251,6 +251,24 @@ git diff --exit-code -- go.mod go.sum
 - [分支CI40998659868](https://github.com/ggggggtm/ZoriDesk/actions/runs/40998659868) 的Linux与macOS作业已实际成功。按本次授权保留历史合入main，合并附带仅更新STATUS/TASKS验收记录；合并提交CI另行核验，不以分支结果替代。
 - 存量7个远端分支已按另一次明确授权通过GitHub原生rename改名，本地跟踪同步，提交SHA全部保持不变；历史记录中的旧名只作当时证据。后续查询使用新名，例如 `fix/optional-runtime-startup`、`fix/sandbox-create-cleanup`、`feat/bounded-execution-output`、`test/sandbox-verification`。
 - 后续定时维护继续Q12的真实诊断缺口，不重复已完成任务；只推送按新规范命名的待审分支，不自动合并main。此次合并不扩大后续授权，调度频率不变。
+
+## Q12 首个真实缺口：调试日志原文泄露（2026-10-30）
+
+基准main `9a2f1b6`；分支 [fix/daemon-diagnostic-redaction](https://github.com/ggggggtm/ZoriDesk/tree/fix/daemon-diagnostic-redaction)。本次不是完整Q12验收，不重复Q11的固定健康原因码、分页与缺工具提示，也不改Q10的取消/超时。
+
+- 先盘点已有实现：`daemonBuildFailureReason`、`daemonFailureMessage`提供闭集原因码；`productOperationalDiagnosticStore`与Swift诊断存储使用结构化字段，导出前有字段过滤；`LocalProductStore`已有配置、凭证、认证、超时与重试建议。不另造日志体系或重新开发这些能力。
+- 确认缺口：`run`在builder失败且`LOOM_DEBUG_DAEMON=1`时，用`%#v`把底层error对象写stderr；错误字段和文本可能带路径、环境值、授权信息。默认输出安全不代表调试输出也安全。
+- 回归先行：新测试在旧实现上真实失败，集中于开启debug后的原文输出与格式化回调；关闭/非1开关和nil情况保留原有行为。修复仅删除原始错误日志分支，统一保留原闭集原因码与退出码，不用文本猜测错误类别、不调用未知错误格式化、不触及凭证存储/权限/模型调用。
+- 本地macOS/arm64 Go1.26.2：定向新回归通过，`verify-startup.sh`普通/race各498条test/subtest记录、`verify-sandbox.sh`普通/race各107条通过，无跳过；目标格式、依赖校验、编译、vet通过，锁文件和CI工作流未变。新增测试由既有`TestRun.*`自然选入CI，未删除或跳过测试。
+- 完整切片经独立只读review无阻断，并修正文档示例归类边界。远端CI需推送后核验，不能把本地通过写成远端成功。未改Swift代码，macOS CI仍运行既有六项；本轮未新增本地Swift运行证据，未验证真实GUI、全仓或模型E2E。
+- 剩余待定向复现项：`LocalProductStore.roundtableErrorMessage`对非`LocalIPCRemoteError`拼接`localizedDescription`，可能显示原文。这是另一条输出路径，尚未修复或声称验证安全。Q12继续in_progress，本切片待审后按具体证据推进，不无界扩展或重新执行已完成任务。
+
+## Q12 启动日志切片授权合并：2026-10-30
+
+- 按维护者明确授权复核`9a2f1b6..052ad2e`全部5文件，并经独立只读审查，未发现阻断问题。原始error日志出口已关闭，原因分类/退出码/取消/授权均不变；严格输出回归仍纳入原测试集合。
+- [分支CI41001765215](https://github.com/ggggggtm/ZoriDesk/actions/runs/41001765215)已实际成功：Linux Sandbox普通/race各107条、启动各498条记录及macOS六项XCTest通过，无跳过。本轮引用同一未变化源码的已验证结果，不冒充重新执行本地测试。
+- 保留历史合入main；额外仅同步STATUS/TASKS/VERIFICATION验收记录，代码、测试与CI工作流保持已审查版本。合并提交须单独核验[main CI](https://github.com/ggggggtm/ZoriDesk/actions?query=branch%3Amain)，失败先修本任务。
+- 本切片不再待审，但Q12整体继续in_progress；下一次核验并复现`LocalProductStore.roundtableErrorMessage`的非远端错误输出，再作独立小切片。只修真实缺口，不重复Q11或已验收的启动日志路径，不自动合并未来任务；全应用脱敏、真实GUI/模型E2E及全仓验证未完成。
 
 ## 状态维护约定
 

@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -752,6 +754,113 @@ func TestRunPublishesSafeBuildFailureReason(t *testing.T) {
 			}
 			if got, want := stderr.String(), "daemon unavailable: "+reason+"\n"; got != want {
 				t.Fatalf("stderr = %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+type debugBuildPrivateError struct {
+	Path          string
+	Authorization string
+	Environment   string
+}
+
+func (failure debugBuildPrivateError) Error() string {
+	return failure.Path + " " + failure.Authorization + " " + failure.Environment
+}
+
+type debugBuildFormattingError struct {
+	calls *int
+}
+
+func (failure debugBuildFormattingError) Error() string {
+	*failure.calls++
+	return "fake-sensitive-error-text"
+}
+
+func (failure debugBuildFormattingError) GoString() string {
+	*failure.calls++
+	return "fake-sensitive-go-string"
+}
+
+func (failure debugBuildFormattingError) Format(state fmt.State, _ rune) {
+	*failure.calls++
+	_, _ = io.WriteString(state, "fake-sensitive-formatted-value")
+}
+
+func TestRunDebugBuildFailureDoesNotDiscloseDetails(t *testing.T) {
+	private := debugBuildPrivateError{
+		Path:          "/private/fake-user/service-config",
+		Authorization: "Authorization: Bearer fake-test-token",
+		Environment:   "FAKE_API_KEY=fake-test-value",
+	}
+	for _, debug := range []struct{ name, value string }{
+		{name: "disabled", value: ""},
+		{name: "enabled", value: "1"},
+		{name: "non_enabled_value", value: "true"},
+	} {
+		t.Run(debug.name, func(t *testing.T) {
+			t.Setenv("LOOM_DEBUG_DAEMON", debug.value)
+			for _, test := range []struct {
+				name   string
+				err    error
+				reason string
+			}{
+				{name: "plain", err: errors.New(private.Error()), reason: "build_unknown"},
+				{name: "private_fields", err: private, reason: "build_unknown"},
+				{name: "wrapped", err: fmt.Errorf("private wrapper: %w", private), reason: "build_unknown"},
+				{name: "known_reason", err: newDaemonBuildFailure("build_state", private), reason: "build_state"},
+				{name: "invalid_reason", err: &daemonBuildFailure{reason: private.Error(), err: private}, reason: "build_unknown"},
+				{name: "joined_conflict", err: errors.Join(newDaemonBuildFailure("build_state", private), newDaemonBuildFailure("build_ipc", private)), reason: "build_unknown"},
+				{name: "nested_conflict", err: newDaemonBuildFailure("build_state", newDaemonBuildFailure("build_ipc", private)), reason: "build_unknown"},
+				{name: "joined_same_reason", err: errors.Join(newDaemonBuildFailure("build_state", private), newDaemonBuildFailure("build_state", private)), reason: "build_state"},
+				{name: "nil_daemon_nil_error", reason: "build_unknown"},
+			} {
+				t.Run(test.name, func(t *testing.T) {
+					var stdout, stderr bytes.Buffer
+					code := run(context.Background(), completeDaemonArgs(), &stdout, &stderr,
+						func(daemonBuildConfig) (daemonRunner, error) { return nil, test.err })
+					if code != exitUnavailable || stdout.Len() != 0 {
+						t.Fatal("build failure changed exit status or produced stdout")
+					}
+					if stderr.String() != "daemon unavailable: "+test.reason+"\n" {
+						t.Fatal("build diagnostic contains non-allowlisted output or lost its safe reason")
+					}
+				})
+			}
+			t.Run("does_not_format_unknown_error", func(t *testing.T) {
+				calls := 0
+				var stdout, stderr bytes.Buffer
+				code := run(context.Background(), completeDaemonArgs(), &stdout, &stderr,
+					func(daemonBuildConfig) (daemonRunner, error) {
+						return nil, debugBuildFormattingError{calls: &calls}
+					})
+				if code != exitUnavailable || stdout.Len() != 0 ||
+					stderr.String() != "daemon unavailable: build_unknown\n" || calls != 0 {
+					t.Fatal("build diagnostic formatted an unknown error or changed its safe output")
+				}
+			})
+		})
+	}
+}
+
+func TestRunDebugBuildFailurePreservesAllClosedReasons(t *testing.T) {
+	t.Setenv("LOOM_DEBUG_DAEMON", "1")
+	for _, reason := range []string{
+		"build_observer", "build_state", "build_setup_runtime",
+		"build_setup_credential", "build_setup_provider", "build_setup_native_auth",
+		"build_decision", "build_execution", "build_assets", "build_queue",
+		"build_workers", "build_integration", "build_ipc", "build_unknown",
+	} {
+		t.Run(reason, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			code := run(context.Background(), completeDaemonArgs(), &stdout, &stderr,
+				func(daemonBuildConfig) (daemonRunner, error) {
+					return nil, newDaemonBuildFailure(reason, errors.New("fake-sensitive-value"))
+				})
+			if code != exitUnavailable || stdout.Len() != 0 ||
+				stderr.String() != "daemon unavailable: "+reason+"\n" {
+				t.Fatal("debug diagnostic disclosed details or failed to preserve the closed reason")
 			}
 		})
 	}

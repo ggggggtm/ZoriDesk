@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"loom-pi-rebuild/internal/app"
 	"loom-pi-rebuild/internal/credentials"
@@ -337,24 +336,8 @@ func run(
 	}
 	daemon, err := builder(config)
 	if err != nil || daemon == nil {
-		if os.Getenv("LOOM_DEBUG_DAEMON") == "1" && err != nil {
-			var leaves []string
-			var visit func(error)
-			visit = func(current error) {
-				if current == nil {
-					return
-				}
-				if joined, ok := current.(interface{ Unwrap() []error }); ok {
-					for _, child := range joined.Unwrap() {
-						visit(child)
-					}
-					return
-				}
-				leaves = append(leaves, fmt.Sprintf("%T: %#v", current, current))
-			}
-			visit(err)
-			_, _ = fmt.Fprintf(stderr, "daemon build detail: %s\n", strings.Join(leaves, " | "))
-		}
+		// Debug mode must not bypass the closed diagnostic boundary: wrapped
+		// errors may contain credentials, environment values or private paths.
 		return writeDaemonError(
 			stderr, exitUnavailable,
 			"daemon unavailable: "+daemonBuildFailureReason(err),
