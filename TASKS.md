@@ -28,7 +28,7 @@
 | Q08 | 数据路径、凭证与兼容策略 | backlog | Q07/Q08 联合方案先评审 |
 | Q09 | 执行输出限制与回归测试 | done | 2026-10-28 按明确授权复核 b40a0fe 并合入 main；本地与分支 CI 普通/race 各 91 条记录通过无跳过，仅验收 Loopback 有界输出 |
 | Q10 | 取消、超时与资源回收 | done | 2026-10-29 对照下方矩阵确认既定范围已覆盖；main 98181f6 与 CI40870981799，普通/race各107条无跳过 |
-| Q11 | 可选运行工具与启动解耦 | review | codex/q11-optional-runtime；本地启动普通/race各447条、Sandbox各107条通过，Swift编译通过；远端CI结果须另核验，未合并 |
+| Q11 | 可选运行工具与启动解耦 | review | codex/q11-optional-runtime；本地启动普通/race各449条、Sandbox各107条通过，Swift编译通过；首轮macOS六项通过、Linux夹具修复后须复验CI，未合并 |
 | Q12 | 可操作的诊断与脱敏 | backlog | Q10、Q11 |
 | Q13 | Docker 后端契约设计 | backlog | Q09、Q10；接口现状核验 |
 | Q14 | Docker 最小执行闭环 | backlog | Q13；Docker 环境可用 |

@@ -322,7 +322,9 @@ func TestQ11MalformedPiMetadataKeepsProductIPCServing(t *testing.T) {
 		Observer: app.LocalRuntimeObservationDaemonConfig{
 			StatePath: statePath, IsolationRoot: isolation, RuntimeSearchPaths: []string{runtimeDir},
 			ProbeID: "q11.pi", RuntimeInstanceID: "runtime.pi.q11", DeviceID: "device.q11", DisplayName: "Malformed fixture",
-			ObservationInterval: time.Second, ProcessTimeout: time.Second,
+			// This checks malformed output, not a one-second scheduling budget.
+			// Match the other real-process IPC fixtures; timeout tests stay separate.
+			ObservationInterval: time.Second, ProcessTimeout: 10 * time.Second,
 		}, SocketPath: socket,
 	})
 	if err != nil {
@@ -355,13 +357,16 @@ func TestQ11MalformedPiMetadataKeepsProductIPCServing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(15 * time.Second)
 	for {
 		var snapshot api.LocalProductSnapshot
 		if err := client.Call(context.Background(), "snapshot", api.LocalProductSnapshotRequest{Limit: 64}, &snapshot); err != nil {
 			t.Fatal(err)
 		}
-		if snapshot.Partial && snapshot.Reason == "observer_version_output" {
+		if snapshot.Partial && snapshot.Reason != "" {
+			if snapshot.Reason != "observer_version_output" {
+				t.Fatalf("wrong partial diagnostic: %q", snapshot.Reason)
+			}
 			break
 		}
 		if time.Now().After(deadline) {

@@ -25,7 +25,8 @@ unformatted=$(gofmt -l \
   cmd/loomd/product_daemon.go cmd/loomd/product_daemon_test.go \
   cmd/loomd/product_composition_agent_runtime.go cmd/loomd/optional_runtime_test.go \
   internal/app/runtime_daemon.go internal/app/optional_runtime_test.go \
-  internal/api/local_product_read.go internal/api/optional_runtime_health_test.go)
+  internal/api/local_product_read.go internal/api/optional_runtime_health_test.go \
+  internal/runtime/piadapter/process_runner_test.go)
 if [[ -n "$unformatted" ]]; then
   printf 'Unformatted files (not modified):\n%s\n' "$unformatted" >&2
   exit 1
@@ -36,7 +37,7 @@ go vet "${packages[@]}"
 
 # Fixed, reviewed fixture-only selection: no user accounts, installed tools, model
 # servers or opt-in live gates. The checker rejects skipped or empty packages.
-tests='^(TestQ11.*|TestRun.*|TestDaemonBuildFailureNestedAmbiguityFailsClosed|TestExpandLocalAppServiceArgs.*|TestOptionalCredentialImportSourceFailsClosedOnUnsafePath|TestPrepareLocalAppInvocation.*|TestParseLocalAppServiceInvocation.*|TestMissionExecutionConfigFromDaemonBuild.*|TestLocalRuntimeObservationDaemon.*|TestNextRuntimeObservationSequence|TestPiLocalRuntimeProbeFactory.*|TestDiscoverConfiguredRuntimes.*|TestProductSetupRemainsAvailableWhenNoRuntimeCanBuildATeam|TestProductDaemonColdStartAdmitsAllNativeProviderRuntimes|TestContainableProductObserverTimeoutRejectsMixedFailureChains|TestProductDaemonContainsExactPiMetadataTimeoutWithoutStoppingIPC|TestObserverFailureReasonIsClosedTypedAndNonDisclosing)$'
+tests='^(TestQ11.*|TestRun.*|TestDaemonBuildFailureNestedAmbiguityFailsClosed|TestExpandLocalAppServiceArgs.*|TestOptionalCredentialImportSourceFailsClosedOnUnsafePath|TestPrepareLocalAppInvocation.*|TestParseLocalAppServiceInvocation.*|TestMissionExecutionConfigFromDaemonBuild.*|TestLocalRuntimeObservationDaemon.*|TestNextRuntimeObservationSequence|TestPiLocalRuntimeProbeFactory.*|TestPiMetadataProcessRunnerSuccessIsolationAndCleanup|TestPiMetadataProcessRunnerMaterializesBoundLocalCatalog|TestDiscoverConfiguredRuntimes.*|TestProductSetupRemainsAvailableWhenNoRuntimeCanBuildATeam|TestProductDaemonColdStartAdmitsAllNativeProviderRuntimes|TestContainableProductObserverTimeoutRejectsMixedFailureChains|TestProductDaemonContainsExactPiMetadataTimeoutWithoutStoppingIPC|TestObserverFailureReasonIsClosedTypedAndNonDisclosing)$'
 report=$(mktemp "${TMPDIR:-/tmp}/zoridesk-startup-tests.XXXXXX")
 trap 'rm -f -- "$report"' EXIT
 trap 'exit 130' INT

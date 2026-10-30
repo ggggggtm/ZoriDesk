@@ -230,6 +230,13 @@ git diff --exit-code -- go.mod go.sum
 - 本机 macOS/arm64、Go 1.26.2、Swift 6.2.4。`swift build --package-path apps/macos --disable-automatic-resolution --jobs 2` 已通过；为解除既有编译器类型推断瓶颈，等价拆分一处长视图表达式，没有改布局或修饰顺序。本机 `swift test` 因 Command Line Tools 缺少 XCTest 未执行到测试，不能记通过；新增独立 macOS CI 执行 6 项状态/分页回归，禁止空选或跳过。
 - 本提交尚不宣称远端 CI 成功，推送后必须读取对应 SHA 的 Linux 普通/race 与 macOS XCTest 结果。未合入 main，Q11 不记 done；安装、签名、桌面操作、真实模型 E2E、自动热恢复及全仓 Go 测试不在已验证范围。
 
+### Q11 首轮 CI 与跨平台测试修正
+
+- 首次提交 `f980af5` 的 [CI 40995171382](https://github.com/ggggggtm/ZoriDesk/actions/runs/40995171382)：macOS/arm64、Swift 6.1.2 实际完成 6 项 XCTest，零失败、无跳过；Linux 的 Sandbox 普通/race各107条通过，但启动普通测试失败，后续启动 race 未执行，整体不能称成功。
+- 唯一远端失败为 `TestPiLocalRuntimeProbeFactoryCarriesCatalogThroughRealParser`。继承的测试夹具通过 `$(BSD stat || GNU stat)` 读取权限，GNU 的失败尝试仍可输出文件系统信息，与后备输出混合。改为分支独立赋值，保留 700/600 精确权限、真实进程与目录清理断言；生产 runner 未改。把另两项使用同一夹具的元数据/目录测试加入验证集合，没有排除失败项。
+- 本地重跑另一次触发新畸形输出用例的 1 秒进程超时，而单独原预算连续10轮通过；不能只凭结果认定 CPU 负载是唯一原因。此用例验证解析错误而非一秒性能，改用现有同类 IPC 测试的10秒预算、15秒观察窗口，任何其他非空原因立即失败，仍精确要求 `observer_version_output`。修改后普通、race各连续10轮通过；没有修改生产超时或现有超时用例。
+- 修正后本地完整启动入口普通/race各 **449** 条记录通过、无跳过；范围扩充了上述两项真实夹具回归。增量经独立只读复核，无阻断项。最新提交 CI 推送后单独核验，不以首次 macOS 成功代表后续提交成功；Q11 保持待审分支，不合并 main。
+
 ## 状态维护约定
 
 - 实现写在分支，不表示已进入 main；待审查和已合并必须区分。
