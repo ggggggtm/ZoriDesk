@@ -1,6 +1,6 @@
 # ZoriDesk 当前状态
 
-更新日期：2026-10-30。本文只记录 ZoriDesk 的事实，不把上游验收记录当作本项目复验结果。
+更新日期：2026-11-02。本文只记录 ZoriDesk 的事实，不把上游验收记录当作本项目复验结果。
 
 ## 项目身份与阅读顺序
 
@@ -16,8 +16,8 @@
 | --- | --- |
 | 公开仓库初始化 | 已完成；保留上游代码和历史，使用 ZoriDesk 名称 |
 | 项目介绍 | 已发布 README，提交 510fdc956d74e533eb6b43551e1fffc3d10d24ef |
-| 运行时代码 | Q05、Q09、Q10、Q11已验收合入main；Q12启动诊断脱敏切片于2026-10-30经明确授权复核合并，整项仍in_progress，继续核验其余输出路径 |
-| 构建、测试、端到端验证 | Q12分支052ad2e的CI41001765215实际成功：Sandbox普通/race各107条、启动各498条、macOS六项无跳过；合并提交CI另行核验。完整桌面操作、安装、真实模型E2E及全仓Go测试未验证 |
+| 运行时代码 | Q05、Q09、Q10、Q11及Q12启动日志切片已合入main；Q12圆桌未知错误切片于2026-11-02经授权复核合并，整项仍in_progress；下一缺口为合法Vault诊断被导出过滤 |
+| 构建、测试、端到端验证 | 圆桌分支06bca11的CI41380833279已实际成功：Sandbox普通/race各107条、启动各498条、macOS十项无跳过；合并CI另验。本地Swift编译及实际Core探针已通过，不冒充本地XCTest。完整GUI、安装、模型E2E及全仓Go测试未验证 |
 | 应用与服务内部名称 | 仍有 Loom / loomd 等既有标识，尚未完成品牌迁移 |
 | 本地开发与提交环境 | 已建立独立 checkout；SSH 认证到正确所有者，仓库级个人提交身份已配置；Q00 记录已真实推送并核对远端 SHA |
 | Docker / Kubernetes 后端 | 后续规划，不能写成已交付能力 |
@@ -34,7 +34,7 @@
 ## 下一步
 
 1. Q00、Q03 经复核并按维护者明确授权合入 main，状态 done；不重复初始化或创建模板。此授权仅针对这两个任务，不改变以后定时维护的分支审查规则。
-2. Q05、Q09、Q10、Q11及分支命名规则均已验收，不再重复实现。Q12的启动日志切片已按明确授权复核合并，合并CI须单独确认；下一次先定向复现`roundtableErrorMessage`非远端错误原文展示路径，再补有证据的缺口。不重新开发调试日志修复、不把Q12标done；后续使用类型/主题分支待审，不自动合并。
+2. Q05、Q09、Q10、Q11及启动日志切片已验收，不重复实现。圆桌脱敏已按明确授权复核合并，合并CI须单独确认；Q12整项不记done。下一项围绕已复现的Vault诊断导出遗漏补回归，不能把未知阶段/原文全部放行；使用类型/主题分支待审，不自动合并。
 3. Q04 随代码和测试同步补充真实路径与关键函数，不阻塞 Q05/Q09；品牌与兼容性任务后置，原有验收、安全边界和分支审查规则保持不变。
 4. 执行前检查实际分支、未提交改动和待审查工作；有未完成任务先收尾，不机械开始新任务。
 
@@ -269,6 +269,22 @@ git diff --exit-code -- go.mod go.sum
 - [分支CI41001765215](https://github.com/ggggggtm/ZoriDesk/actions/runs/41001765215)已实际成功：Linux Sandbox普通/race各107条、启动各498条记录及macOS六项XCTest通过，无跳过。本轮引用同一未变化源码的已验证结果，不冒充重新执行本地测试。
 - 保留历史合入main；额外仅同步STATUS/TASKS/VERIFICATION验收记录，代码、测试与CI工作流保持已审查版本。合并提交须单独核验[main CI](https://github.com/ggggggtm/ZoriDesk/actions?query=branch%3Amain)，失败先修本任务。
 - 本切片不再待审，但Q12整体继续in_progress；下一次核验并复现`LocalProductStore.roundtableErrorMessage`的非远端错误输出，再作独立小切片。只修真实缺口，不重复Q11或已验收的启动日志路径，不自动合并未来任务；全应用脱敏、真实GUI/模型E2E及全仓验证未完成。
+
+## Q12 Roundtable 未知错误脱敏：2026-11-02
+
+- 基准main`00d890f`，分支`fix/roundtable-error-redaction`。只修`runRoundtable`捕获异常后经`roundtableErrorMessage`写入界面的未知错误分支：原`localizedDescription`可包含路径、配置与授权值。类型化`LocalIPCRemoteError`的code、安全消息及stage规则、成功清空旧错误的流程不变，不改权限或状态事实。
+- 用虚构NSError敏感值在真实已编译Core模块上调用该函数，旧实现实际退出失败；移除原文读取并返回固定的检查本地连接/重试提示后，同一探针通过，类型化错误兼容断言通过。不是对字符串做正则脱敏，也不按未知文本猜测认证原因。
+- 新增四项XCTest覆盖未知错误、禁止求值LocalizedError描述、六类本地错误固定提示、类型化远端消息与stage兼容。原脚本保留六项并加入四项（合计十项），继续逐项要求passed、拒绝skip/failed/空选；未放宽测试、未改CI权限/依赖锁。
+- 本地Swift6.2.4编译通过，真实Core模块探针先红后绿，脚本语法和差异检查通过；本机CLT无XCTest，不能称本地XCTest通过。当前没有Go改动，不机械重跑未变化Go基线；远端既有普通/race与十项XCTest必须实际成功后才能交付。未验证真实桌面、全应用脱敏或模型E2E。
+- Q12整体in_progress，本切片待审不等于done，推送后单独核验对应SHA的CI；下一次先处理本分支反馈，不重做启动日志或本次已修路径，不自动合并main。
+
+## 圆桌切片授权合并与Q12剩余核验：2026-11-02
+
+- 维护者明确授权复核`fix/roundtable-error-redaction`并无阻断后合并main。主审及独立只读review检查`00d890f..06bca11`全部六文件，无阻断问题；只关闭未知错误描述出口，类型化远端消息/阶段、成功清错、权限均不变，原六项和新四项测试都保留。
+- [分支CI41380833279](https://github.com/ggggggtm/ZoriDesk/actions/runs/41380833279)的实际Linux普通/race（Sandbox各107条、启动各498条）及macOS十项XCTest已成功、无跳过。本轮引用未变化源码的既有结果，不重复本地测试或宣称新跑XCTest。保留历史合并，额外仅STATUS/TASKS/VERIFICATION验收与下一项说明；合并提交需单独核验[main CI](https://github.com/ggggggtm/ZoriDesk/actions?query=branch%3Amain)。
+- 已复现的剩余缺口：`LocalDiagnosticBundleExporter.safeEvent`在`safeStage`检查时拒绝合法`vault_*`阶段，而Go与Swift诊断生产者能够写出Vault事件。用真实Core模块中的Swift诊断存储分别写入合法`provider_connect`、`vault_open`记录，再调用实际exporter.preview，只导出前者、跳过一条。非纯代码猜测，也不是圆桌修复引入。
+- 下一有界验收：保留合法Vault故障的incidentID/stage/闭集错误码到预览及导出JSON，同时继续拒绝未知stage、错误字段组合与原文；对照实际生产者盘点租约/迁移阶段是否同样被漏掉。不能直接放开全部字符串或绕过脱敏检查。
+- 外部Provider的`error.code`目前主要通过长度/字符校验，是否需要进一步收紧属于后续协议/边界核验线索，尚未在真实调用链复现凭据泄露，不当作已确认事故。本次只列证据与下一步，没有修改相关实现；不宣称全应用诊断已验收或Q12 done。后续分支仍待审，不自动合并。
 
 ## 状态维护约定
 

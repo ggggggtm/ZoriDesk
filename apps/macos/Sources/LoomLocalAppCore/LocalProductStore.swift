@@ -1909,7 +1909,8 @@ public final class LocalProductStore: ObservableObject {
       }
       return "Roundtable \(remote.code): \(remote.safeMessage)\(suffix)"
     }
-    return "Roundtable unavailable: \(error.localizedDescription)"
+    // Unknown errors can contain credentials, configuration values or user paths.
+    return "Roundtable unavailable. Check the local service connection, then try again."
   }
 
   public func roundtableCreateSession(
