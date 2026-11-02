@@ -954,6 +954,7 @@ public final class LocalDiagnosticBundleExporter: @unchecked Sendable {
             "provider_dns", "provider_tls", "provider_connect", "provider_http",
             "provider_auth", "provider_rate_limit", "profile_publish",
             "conversation_dispatch", "agent_attempt_dispatch",
+            "agent_attempt_reconcile", "tool_recovery",
             "preflight_lease", "view_drift", "preflight_digest",
             "parent_continuation", "flight_conflict", "dispatch_admission",
             "dispatch_capacity", "dispatch_attempt_validation",

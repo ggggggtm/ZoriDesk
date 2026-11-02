@@ -21,6 +21,9 @@ tests=(
 )
 filter=$(IFS='|'; echo "${tests[*]}")
 diagnostic_tests=(
+  testRecoveryStagesSurviveAppPreviewAndExport
+  testRecoveryStagesSurviveDaemonPreviewAndExport
+  testRecoveryStageExpansionKeepsInvalidRecordsExcluded
   testCredentialStagesSurviveAppPreviewAndExport
   testCredentialStagesSurviveDaemonPreviewAndExport
   testCredentialStageExpansionKeepsInvalidRecordsExcluded

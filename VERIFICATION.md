@@ -123,7 +123,7 @@ bash scripts/verify-startup-ui.sh
 
 [verify-startup.sh](scripts/verify-startup.sh) 先检查格式、锁定依赖、目标包编译和 vet，再执行固定的无账号回归集合并用原 `testreport` 校验器拒绝 skip/空包/未完成测试。覆盖首次启动组合、互斥参数、共享目录保护、实际服务构造到本地 IPC、原生适配器装配、历史 Pi 候选过滤、空观察重启及错误分类；测试使用临时库、测试工具脚本和假凭证，不调用真实模型。
 
-[verify-startup-ui.sh](scripts/verify-startup-ui.sh) 固定执行25项XCTest：原六项Pi原因码/分页/超时降级、四项Roundtable错误兼容，加上完整15项诊断导出测试（原12项及本次3项凭证阶段回归）。逐项要求实际通过记录，拒绝跳过和空选；它使用假客户端、临时日志与虚构错误，不启动真实后端或图形界面。`MissionWorkbench` 的长表达式只做等价分段以解除编译器类型推断瓶颈。
+[verify-startup-ui.sh](scripts/verify-startup-ui.sh) 固定执行28项XCTest：原六项Pi原因码/分页/超时降级、四项Roundtable错误兼容，加上完整18项诊断导出测试（原12项、3项凭证阶段及本次3项恢复阶段回归）。逐项要求实际通过记录，拒绝跳过和空选；它使用假客户端、临时日志与虚构错误，不启动真实后端或图形界面。`MissionWorkbench` 的长表达式只做等价分段以解除编译器类型推断瓶颈。
 
 范围：Pi/Node 的启动耦合，不承诺任意第三方 CLI 错误均互不影响。显式错误配置仍拒绝；其他工具自己的依赖仍需满足。缺少 Pi/Node 的操作建议写入现有 daemon 控制台日志，不声称已新增 UI 安装向导。SwiftPM 应用编译已在本机通过，XCTest 的实际运行环境与结果见 STATUS；桌面操作、安装/签名/迁移、真实账号/E2E、工具修复后的自动热恢复未验证。原有 Sandbox 107 条回归不能替代本节的启动验证。
 
@@ -178,3 +178,7 @@ macOS 的 `swift package --package-path apps/macos dump-package` 仍是独立的
 这是原有Agent/工具恢复功能的诊断链，不是重新开发Q10的取消或暂停恢复。`LocalIPCClient`调用恢复接口后，经原`recordAgentRecovery`/`recordToolRecovery`写私有日志；没有远端故障阶段时分别使用`agent_attempt_reconcile`/`tool_recovery`，有类型化故障则记录故障阶段。当前`safeStage`未覆盖这两个默认阶段，因此日志能写入，预览却漏掉事件。
 
 实际编译Core探针写入1条provider对照和4条恢复成功/失败记录，预览只保留provider并计4条skipped，导出JSON保持同一遗漏。下一次应为真实App写入及Daemon形状日志补预览/JSON回归，再最小补两阶段；安全拒绝规则不能退化。这里的恢复记录包含`recovery_operation`，但当前导出事件模型并不承诺保留该字段，本轮不把“补阶段”扩大为新增模型/权限。诊断遗漏是确认事实，不等于恢复执行功能本身失败；Q12尚未整项完成。
+
+2026-11-02后续修复（待审分支`fix/recovery-diagnostic-export`）：先补三项XCTest，再只在`safeStage`加入上述两个固定值。原恢复请求、权限、日志生产者、字段/网关校验和JSON模型均未改；`recovery_operation`依旧不在导出字段内，不承诺新增操作明细。成功/失败诊断现在能携带原有incidentID/stage/result/error/retryability进入预览与JSON，非网关segment、非法组合、未知阶段和原文仍拒绝。
+
+新增实际Core探针覆盖App/Daemon八条恢复记录和provider对照：旧代码仅1/9合法事件保留，修复后9/9保留、11条负向记录仍拒绝，JSON及0600一致；XCTest另有21种负向组合，与探针计数区分。Swift普通模块编译/运行及独立scratch构建的ThreadSanitizer模块/探针通过，TSan只验证所执行路径，不是全部XCTest或全应用竞态证明。本机CLT无XCTest，CI继续以28项实际XCTest与原Go普通/race作为交付条件；未安装依赖、放宽断言或跳过测试。

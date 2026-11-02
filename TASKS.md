@@ -30,7 +30,7 @@
 | Q09 | 执行输出限制与回归测试 | done | 2026-10-28 按明确授权复核 b40a0fe 并合入 main；本地与分支 CI 普通/race 各 91 条记录通过无跳过，仅验收 Loopback 有界输出 |
 | Q10 | 取消、超时与资源回收 | done | 2026-10-29 对照下方矩阵确认既定范围已覆盖；main 98181f6 与 CI40870981799，普通/race各107条无跳过 |
 | Q11 | 可选运行工具与启动解耦 | done | 2026-10-30按明确授权复核3516dad并合入main；CI40996224960启动普通/race各449条、Sandbox各107条、macOS六项通过无跳过；合并CI另行确认 |
-| Q12 | 可操作的诊断与脱敏 | in_progress | 启动日志、圆桌与Vault切片已授权复核合并；Vault分支CI41383116299第二次普通/race及25项XCTest成功无skip，本次合并CI另验。下一实际复现缺口：Agent/工具恢复阶段诊断被导出过滤 |
+| Q12 | 可操作的诊断与脱敏 | in_progress | 已验收切片不重复；fix/recovery-diagnostic-export补两阶段导出，普通/TSan实际Core探针通过，28项XCTest与CI推送后另验，未合main |
 | Q13 | Docker 后端契约设计 | backlog | Q09、Q10；接口现状核验 |
 | Q14 | Docker 最小执行闭环 | backlog | Q13；Docker 环境可用 |
 | Q15 | Docker 资源边界与故障验证 | backlog | Q14 |
@@ -167,6 +167,8 @@ Q01、Q02 为 2026-10-13 初始化文档交付；只代表维护文档，不代�
 - 验收：缺失可选工具、配置错误和已安装工具三种路径有测试，其他可用后端不被阻断。
 
 ### Q12：让诊断可理解、可操作
+
+当前切片（2026-11-02）：`fix/recovery-diagnostic-export`基于main504c415，测试先行、一行补两个恢复阶段；预览/JSON、正常对照与21种负向记录有三项新XCTest，保留原25项共28项。本地实际Core普通/ThreadSanitizer探针通过，CLT无XCTest，正式XCTest和既有Go普通/race由CI实际执行。先核验本分支结果与审查反馈，不合main、不重复已验收修复；下方“下一次补恢复”属于本次修复前审计。Provider/AgentInput仅是待核验线索，先明确支持契约与实际复现，不能据此机械扩大白名单或宣称整项done。
 
 最新验收与下一项（2026-11-02）：`9df31e7`全部六文件经再次完整及独立review无阻断，分支CI41383116299第二次运行成功；按维护者明确授权保留历史合入main，合并CI另行确认。Vault15阶段不再待审、不重复实现；本节后续待审/下一次补Vault属于历史记录。Q12仍in_progress。
 
