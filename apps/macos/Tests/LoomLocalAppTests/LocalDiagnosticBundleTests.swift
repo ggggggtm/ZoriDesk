@@ -13,6 +13,133 @@ final class LocalDiagnosticBundleTests: XCTestCase {
         .migrationRead, .migrationCommit, .migrationCleanup,
     ]
 
+    private let recoveryStages: [LocalIPCRemoteError.Stage] = [
+        .agentAttemptReconcile, .toolRecovery,
+    ]
+
+    func testRecoveryStagesSurviveAppPreviewAndExport() throws {
+        let fixture = try makeFixture(records: [])
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let store = try LocalOperationalDiagnostics(
+            directory: fixture.root.appendingPathComponent("diagnostics"),
+            maximumBytes: 16 * 1_024,
+            now: { Date(timeIntervalSince1970: 1_787_500_800) }
+        )
+        for failed in [false, true] {
+            try store.recordAgentRecovery(
+                incidentID: "app-recovery-agent_attempt_reconcile-\(failed)",
+                operation: .preview,
+                stage: .agentAttemptReconcile,
+                result: failed ? "failed" : "succeeded",
+                errorCode: failed ? .stateUnavailable : nil,
+                retryable: failed,
+                elapsedMilliseconds: 17
+            )
+            try store.recordToolRecovery(
+                incidentID: "app-recovery-tool_recovery-\(failed)",
+                operation: .preview,
+                stage: .toolRecovery,
+                result: failed ? "failed" : "succeeded",
+                errorCode: failed ? .stateUnavailable : nil,
+                retryable: failed,
+                elapsedMilliseconds: 17
+            )
+        }
+
+        let preview = try fixture.exporter.preview(input: .init())
+        XCTAssertEqual(preview.events.count, 4)
+        XCTAssertEqual(preview.diagnosticFilesSkipped, 0)
+        try assertRecoveryEvents(preview, source: "app")
+        try assertExportRoundTrip(preview, fixture: fixture)
+        let exported = try String(
+            contentsOf: fixture.root.appendingPathComponent("credential-diagnostics.json"),
+            encoding: .utf8
+        )
+        // The existing export model does not expose recovery-operation details.
+        XCTAssertFalse(exported.contains("recovery_operation"))
+    }
+
+    func testRecoveryStagesSurviveDaemonPreviewAndExport() throws {
+        var records = recoveryStages.flatMap { stage in
+            [false, true].map { failed in recoveryRecord(stage: stage, failed: failed) }
+        }
+        var provider = credentialRecord(stage: "provider_auth", failed: true)
+        provider["error_code"] = "provider_auth"
+        records.append(provider)
+        records.append(credentialRecord(stage: "vault_open", failed: true))
+        records.append(gatewayRecord(version: 3))
+        let fixture = try makeFixture(records: records)
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+
+        let preview = try fixture.exporter.preview(input: .init())
+        XCTAssertEqual(preview.events.count, 7)
+        XCTAssertEqual(preview.diagnosticFilesSkipped, 0)
+        try assertRecoveryEvents(preview, source: "daemon")
+        XCTAssertTrue(preview.events.contains { $0.stage == "provider_auth" })
+        XCTAssertTrue(preview.events.contains { $0.stage == "vault_open" })
+        XCTAssertTrue(preview.events.contains { $0.gatewayEventSchemaVersion == 3 })
+        try assertExportRoundTrip(preview, fixture: fixture)
+    }
+
+    func testRecoveryStageExpansionKeepsInvalidRecordsExcluded() throws {
+        let valid = recoveryStages.map { recoveryRecord(stage: $0, failed: true) }
+        var invalid: [[String: Any]] = []
+        for stage in [
+            "agent_attempt_reconcile_future", "tool_recovery_future",
+            "agent_attempt_reconcile private", "tool_recovery/private",
+        ] {
+            var record = valid[0]
+            record["stage"] = stage
+            invalid.append(record)
+        }
+        for stage in recoveryStages {
+            var missingFailureCode = recoveryRecord(stage: stage, failed: true)
+            missingFailureCode.removeValue(forKey: "error_code")
+            invalid.append(missingFailureCode)
+            var successWithError = recoveryRecord(stage: stage, failed: true)
+            successWithError["result"] = "succeeded"
+            successWithError["retryable"] = false
+            invalid.append(successWithError)
+            var retryableSuccess = recoveryRecord(stage: stage, failed: false)
+            retryableSuccess["retryable"] = true
+            invalid.append(retryableSuccess)
+            var nongatewaySegment = recoveryRecord(stage: stage, failed: true)
+            nongatewaySegment["segment_id"] = "segment-must-not-survive"
+            invalid.append(nongatewaySegment)
+            var mixedGateway = gatewayRecord(version: 3)
+            mixedGateway["stage"] = stage.rawValue
+            invalid.append(mixedGateway)
+        }
+        for key in [
+            "authorization_header", "credential_reference", "secret",
+            "workspace_path", "prompt", "provider_response_body",
+        ] {
+            var record = valid[1]
+            record[key] = "must-not-survive-\(key)"
+            invalid.append(record)
+        }
+        var nested = valid[1]
+        nested["extra"] = ["secret": "must-not-survive-nested"]
+        invalid.append(nested)
+        let fixture = try makeFixture(records: valid + invalid)
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+
+        let preview = try fixture.exporter.preview(input: .init())
+        XCTAssertEqual(Set(preview.events.map(\.incidentID)), Set(valid.compactMap {
+            $0["incident_id"] as? String
+        }))
+        XCTAssertEqual(preview.events.count, 2)
+        XCTAssertEqual(preview.diagnosticFilesSkipped, invalid.count)
+        try assertExportRoundTrip(preview, fixture: fixture)
+        let exported = try String(
+            contentsOf: fixture.root.appendingPathComponent("credential-diagnostics.json"),
+            encoding: .utf8
+        )
+        XCTAssertFalse(exported.contains("must-not-survive"))
+        XCTAssertFalse(exported.contains("reconcile_future"))
+        XCTAssertFalse(exported.contains("tool_recovery_future"))
+    }
+
     func testCredentialStagesSurviveAppPreviewAndExport() throws {
         let fixture = try makeFixture(records: [])
         defer { try? FileManager.default.removeItem(at: fixture.root) }
@@ -592,6 +719,48 @@ final class LocalDiagnosticBundleTests: XCTestCase {
         XCTAssertFalse(preview.socketHealthy)
         XCTAssertTrue(preview.events.isEmpty)
         XCTAssertEqual(preview.diagnosticFilesSkipped, 1)
+    }
+
+    private func recoveryRecord(
+        stage: LocalIPCRemoteError.Stage,
+        failed: Bool
+    ) -> [String: Any] {
+        var record: [String: Any] = [
+            "schema_version": 1,
+            "occurred_at": "2026-08-24T11:12:13.000Z",
+            "incident_id": "daemon-recovery-\(stage.rawValue)-\(failed)",
+            "operation": stage == .agentAttemptReconcile ? "agent_attempt_recovery" : "tool_recovery",
+            "credential_helper_spawn_attempts": 0,
+            "stage": stage.rawValue,
+            "elapsed_ms": 17,
+            "result": failed ? "failed" : "succeeded",
+            "retryable": failed,
+        ]
+        if failed { record["error_code"] = "state_unavailable" }
+        return record
+    }
+
+    private func assertRecoveryEvents(
+        _ preview: LocalDiagnosticBundlePreview,
+        source: String
+    ) throws {
+        for stage in recoveryStages {
+            for failed in [false, true] {
+                let event = try XCTUnwrap(preview.events.first {
+                    $0.incidentID == "\(source)-recovery-\(stage.rawValue)-\(failed)"
+                })
+                XCTAssertEqual(event.source, source)
+                XCTAssertEqual(event.stage, stage.rawValue)
+                XCTAssertEqual(
+                    event.operation,
+                    stage == .agentAttemptReconcile ? "agent_attempt_recovery" : "tool_recovery"
+                )
+                XCTAssertEqual(event.elapsedMilliseconds, 17)
+                XCTAssertEqual(event.result, failed ? "failed" : "succeeded")
+                XCTAssertEqual(event.errorCode, failed ? "state_unavailable" : nil)
+                XCTAssertEqual(event.retryable, failed)
+            }
+        }
     }
 
     private func credentialRecord(stage: String, failed: Bool) -> [String: Any] {

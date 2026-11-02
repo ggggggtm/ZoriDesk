@@ -16,8 +16,8 @@
 | --- | --- |
 | 公开仓库初始化 | 已完成；2026-11-02通过GitHub原生操作脱离Fork网络，地址/ID、12分支SHA及320个可达提交未变，必要来源与许可保留 |
 | 项目介绍 | 已发布 README，提交 510fdc956d74e533eb6b43551e1fffc3d10d24ef |
-| 运行时代码 | Q05、Q09、Q10、Q11及Q12启动日志/圆桌/Vault导出切片已按明确授权复核合入main；Q12仍in_progress，下一已复现缺口为Agent/工具恢复诊断的导出遗漏 |
-| 构建、测试、端到端验证 | Vault分支9df31e7的CI41383116299第二次运行实际成功：Sandbox普通/race各107条、启动各498条、macOS25项无跳过；本次合并CI单独确认。完整GUI、安装、模型E2E及全仓Go测试未验证 |
+| 运行时代码 | 启动日志、圆桌、Vault及Agent/工具恢复诊断切片均已按明确授权复核合入main，不重复开发；Q12仍in_progress，下一确认项为模拟上游凭证回显进入ProviderCode的隐私边界 |
+| 构建、测试、端到端验证 | 恢复分支2a8b0b3的CI41406327459实际成功：Sandbox普通/race各107条、启动各498条、macOS28项无skip；本次合并CI另验。本地普通/TSan Core探针不是完整XCTest或全应用证明，完整GUI、模型E2E及全仓未验证 |
 | 应用与服务内部名称 | 仍有 Loom / loomd 等既有标识，尚未完成品牌迁移 |
 | 本地开发与提交环境 | 已建立独立 checkout；SSH 认证到正确所有者，仓库级个人提交身份已配置；Q00 记录已真实推送并核对远端 SHA |
 | Docker / Kubernetes 后端 | 后续规划，不能写成已交付能力 |
@@ -34,7 +34,7 @@
 ## 下一步
 
 1. Q00、Q03 经复核并按维护者明确授权合入 main，状态 done；不重复初始化或创建模板。此授权仅针对这两个任务，不改变以后定时维护的分支审查规则。
-2. Q05、Q09、Q10、Q11及启动日志/圆桌/Vault切片已验收，不重复实现；本次先确认合并CI。Q12下一项仅处理已复现的`agent_attempt_reconcile`/`tool_recovery`合法记录导出遗漏，保持未知阶段/原文拒绝；外部Provider代码语义仍只是待核验线索。后续分支仍须审查，不自动合并。
+2. 已验收切片不重复；先确认本次恢复诊断合并CI。Q12下一小切片针对已在隔离假HTTP场景复现的ProviderCode凭证回显，先补回归并明确安全回退，保留合法码/HTTP分类/固定提示；Agent Input导出仅是支持范围待确认，不直接扩展非网关字段。后续分支仍须审查，不自动合并。
 3. Q04 随代码和测试同步补充真实路径与关键函数，不阻塞 Q05/Q09；品牌与兼容性任务后置，原有验收、安全边界和分支审查规则保持不变。
 4. 执行前检查实际分支、未提交改动和待审查工作；有未完成任务先收尾，不机械开始新任务。
 
@@ -299,6 +299,21 @@ git diff --exit-code -- go.mod go.sum
 - 新确认遗漏不由本次凭证修复引入：`LocalIPCClient.recordAgentRecovery`/`recordToolRecovery`会分别记录`agent_attempt_reconcile`/`tool_recovery`；Go生产者也认可这两个阶段，但导出器尚未列入。真实已编译Core模块探针调用原诊断写入函数，写入1条provider对照与4条恢复成功/失败记录；实际预览/导出只保留对照、跳过4条。不是仅比较枚举或推测字段名称。
 - 下一小切片先补App/Daemon的恢复阶段预览/JSON回归，再最小补齐这两个生产者已有阶段；保留incidentID、stage、result、error、retryability及正常provider/gateway行为，未知阶段/非法组合/敏感字段继续拒绝。`recovery_operation`目前不属于导出事件模型，不把保留它描述为既有保证；如有明确需求应另定类型化字段契约，不顺带扩展整个模型。
 - Provider外部`error.code`仍是语法校验的协议/信任边界线索，尚无真实调用链泄露的复现，本轮不改、不把它列为已确认事故。另有Agent Input的stage/segment字段兼容线索，先确认导出格式契约与实际复现，不全局放开非网关segment字段。未执行新功能开发、全仓/E2E/真实模型验证；本次合并授权不适用于后续分支。
+
+## Q12 Agent/工具恢复诊断导出：2026-11-02
+
+- 基准main`504c415`，分支`fix/recovery-diagnostic-export`；只给`safeStage`补`agent_attempt_reconcile`、`tool_recovery`两个原生产者已有阶段，不修改恢复执行、权限、导出模型或旧Vault阶段。先补三项XCTest，再获实际RED后作一行生产修复。
+- App通过原`recordAgentRecovery`/`recordToolRecovery`写四条成功/失败记录；Daemon形状四条并保留provider/Vault/gateway对照。逐项核对来源、ID、阶段、操作、耗时、结果/错误与retryability，JSON往返及0600不变；21项负向矩阵覆盖未知阶段、非法结果组合、非网关segment、混合网关与敏感/嵌套字段。原25项不删，CI入口新增三项，共28项逐项要求passed，拒绝skip/空选。
+- 本地真实Core模块新探针先红后绿：修复前合法1/9保留、误拒19/11（八条恢复丢失）；修复后合法9/9保留、11/11负向拒绝，预览/JSON/结果/来源/权限断言通过。Swift6.2.4应用编译、测试源码parse、脚本语法/选择集合及差异检查通过。CLT无XCTest，不把探针当作XCTest；macOS CI必须实际执行28项。
+- 额外用Swift内置ThreadSanitizer编译真实Core目标并链接探针，运行通过、未报告竞态，验证二进制确实链接TSan运行库；仅说明所覆盖路径，不宣称全应用线程安全。首次后台TSan构建因源码在构建期间变动而中止，源码冻结后重新构建并运行成功，不隐藏未完成记录。未安装工具、下载Swift包、调用模型或改CI权限；Go源码未变，既有远端普通/race仍保留并须实际成功。
+- 完整六文件经独立只读review无阻断。本切片供审查、未合main，Q12整体继续in_progress；只推进本次已复现缺口，尚未核验的Provider/AgentInput不顺带处理。CI结果推送后单独确认，不以本地普通/TSan探针替代XCTest或远端CI。
+
+## 恢复诊断切片授权合并与Q12边界核验：2026-11-02
+
+- 完整`504c415..2a8b0b3`六文件经主审及新的独立只读review，无阻断项；只补两个恢复阶段，既有隐私/字段/网关/权限/容量边界与25项旧回归均保留。[分支CI41406327459](https://github.com/ggggggtm/ZoriDesk/actions/runs/41406327459)实际普通/race及macOS28项通过无skip。本轮引用未变化源码已有证据，不机械重跑相同本地检查；按本次明确授权保留历史合入main，合并CI须单独确认。本切片不再待审，历史待审说明保留。
+- 新确认的条件性隐私缺口：在隔离的当前Git归档副本中，使用实际`NewDeepSeekConversationClient.Respond`与假HTTPDoer，把虚构请求凭据回填到401响应的`error.code`；实际`ConversationFailureDetails.ProviderCode`等于虚构凭据，`NewLocalProductConversationDispatchErrorWithDetails`也接受并保留。固定`Error()`/`UserMessage`没有该值，因此问题在不可信诊断元数据，不是所有安全提示都失效。没有真实网络、真实密钥、Vault或GUI操作，也不称线上泄露事件。
+- 源码确认下游API会保存ProviderCode，daemon诊断和Swift错误详情有对应出口；本轮动态验证到Provider/API边界，未把源码追踪当作已执行GUI/日志出口。下一验收应先补上游回显虚构凭据回归，至少阻止已知请求凭据进入安全诊断码，同时明确未知码回退，保留合法字符串/数值码、HTTP分类和retry字段兼容；不能只按某个密钥前缀猜测，不扩展为全应用秘密扫描。
+- Agent Input的stage/segment结构与当前导出规则不匹配，但现有测试明确拒绝非Gateway segment，限定核验中未找到必须完整导出Agent Input的支持承诺。因此只是范围待确认，不列为必须修完的既有缺陷，也不全局放开字段；若要支持，需另定有限类型与字段契约。Q12收口应对照原有分类/建议/脱敏验收，不因其他未承诺阶段无限扩白名单。本轮未实现上述下一切片，Q12暂仍in_progress，后续不自动合main。
 
 ## 状态维护约定
 
