@@ -123,7 +123,7 @@ bash scripts/verify-startup-ui.sh
 
 [verify-startup.sh](scripts/verify-startup.sh) 先检查格式、锁定依赖、目标包编译和 vet，再执行固定的无账号回归集合并用原 `testreport` 校验器拒绝 skip/空包/未完成测试。覆盖首次启动组合、互斥参数、共享目录保护、实际服务构造到本地 IPC、原生适配器装配、历史 Pi 候选过滤、空观察重启及错误分类；测试使用临时库、测试工具脚本和假凭证，不调用真实模型。
 
-[verify-startup-ui.sh](scripts/verify-startup-ui.sh) 固定执行 6 项 XCTest：11 种 Pi 原因码与分页同时存在、正常分页、原超时降级。逐项要求实际通过记录，拒绝跳过和空选；它使用假客户端，不启动真实后端或图形界面。`MissionWorkbench` 的长表达式只做等价分段以解除编译器类型推断瓶颈。
+[verify-startup-ui.sh](scripts/verify-startup-ui.sh) 固定执行10项XCTest：保留原六项Pi原因码/分页/超时降级回归，新增四项Roundtable未知错误脱敏与类型化错误兼容回归。逐项要求实际通过记录，拒绝跳过和空选；它使用假客户端与虚构错误，不启动真实后端或图形界面。`MissionWorkbench` 的长表达式只做等价分段以解除编译器类型推断瓶颈。
 
 范围：Pi/Node 的启动耦合，不承诺任意第三方 CLI 错误均互不影响。显式错误配置仍拒绝；其他工具自己的依赖仍需满足。缺少 Pi/Node 的操作建议写入现有 daemon 控制台日志，不声称已新增 UI 安装向导。SwiftPM 应用编译已在本机通过，XCTest 的实际运行环境与结果见 STATUS；桌面操作、安装/签名/迁移、真实账号/E2E、工具修复后的自动热恢复未验证。原有 Sandbox 107 条回归不能替代本节的启动验证。
 
@@ -150,3 +150,11 @@ macOS 的 `swift package --package-path apps/macos dump-package` 仍是独立的
 [run_test.go](cmd/loomd/run_test.go)的`TestRunDebugBuildFailureDoesNotDiscloseDetails`与`TestRunDebugBuildFailurePreservesAllClosedReasons`覆盖普通/字段/包装/Join错误、非法与冲突原因、nil daemon、三种开关值和14类固定构建原因；严格断言stdout为空、退出码和stderr单行输出不变。另验证不调用未知错误的Error/GoString/Format，不在失败输出中打印原始内容。先在旧实现复现失败，再修复。
 
 新增测试属于既有`TestRun.*`选择集合，直接通过`verify-startup.sh`普通/race进入现有CI，不增加平行脚本或跳过测试。测试只注入虚构错误，不读取真实凭据、不调用模型。范围仅为daemon构建失败日志，不宣称已审计整个应用的所有日志/界面路径；Q12整体验收仍需检查剩余真实缺口，分支交付不记done。
+
+### 后续界面路径：Roundtable未知错误（2026-11-02）
+
+`runRoundtable`捕获异常→`roundtableErrorMessage`生成字符串→`roundtableError`展示。原未知错误分支直接读取`localizedDescription`，可能显示用户路径、环境配置或授权值；固定提示替换这一出口后，不再求值未知错误的描述，也不把未知错误猜成认证/网络失败。提示检查本地连接再重试只是建议，不自动重试、有副作用的操作仍受原流程与权限限制。
+
+类型化`LocalIPCRemoteError`继续沿原code/safeMessage/stage展示，包括conversationDispatch不追加stage的既有规则；本切片不声称能过滤任意错误中所有字段，不改远端协议或授权。成功操作清除旧错误的原路径未变。
+
+本地使用`swift build`编译真实Core模块，再链接该模块对象调用实际函数的独立探针，虚构敏感NSError在旧实现失败、修复后通过，并验证类型化结果兼容。该探针不是XCTest，不能代替macOS CI；CLT缺少XCTest时明确记录限制。四项新增XCTest及原六项都在同一验证脚本逐项核验，Go普通/race仍由原CI执行。检查范围是这个界面出口，不等于全应用脱敏或真实GUI/E2E验收。

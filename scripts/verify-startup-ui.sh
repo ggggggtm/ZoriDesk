@@ -14,6 +14,10 @@ tests=(
   testNavigationPaginationKeepsHealthyConnectionState
   testObserverModelsTimeoutKeepsDegradedPartialState
   testObserverVersionTimeoutKeepsDegradedPartialState
+  testRoundtableUnknownErrorUsesSafeRecoveryMessage
+  testRoundtableLocalizedErrorDescriptionIsNotEvaluated
+  testRoundtableClientErrorsUseSafeRecoveryMessage
+  testRoundtableRemoteErrorKeepsSafeMessageAndStage
 )
 filter=$(IFS='|'; echo "${tests[*]}")
 report=$(mktemp "${TMPDIR:-/tmp}/zoridesk-startup-ui.XXXXXX")
@@ -34,4 +38,4 @@ for test_name in "${tests[@]}"; do
     exit 1
   fi
 done
-echo "Verified all 6 selected XCTest cases passed; no skips."
+echo "Verified all ${#tests[@]} selected XCTest cases passed; no skips."

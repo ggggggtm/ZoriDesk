@@ -5,8 +5,83 @@ import XCTest
 
 @testable import LoomLocalAppCore
 
+private final class RoundtableDescriptionCounter: @unchecked Sendable {
+  var calls = 0
+}
+
+private struct RoundtableSensitiveLocalizedError: LocalizedError {
+  let counter: RoundtableDescriptionCounter
+
+  var errorDescription: String? {
+    counter.calls += 1
+    return "/private/fake-user/config Authorization: Bearer fake-test-token"
+  }
+}
+
 @MainActor
 final class LocalProductStoreTests: XCTestCase {
+  func testRoundtableUnknownErrorUsesSafeRecoveryMessage() async {
+    let error = NSError(
+      domain: "private-roundtable-error", code: 1,
+      userInfo: [NSLocalizedDescriptionKey:
+        "/private/fake-user/config Authorization: Bearer fake-test-token FAKE_API_KEY=fake-value"]
+    )
+    let message = LocalProductStore.roundtableErrorMessage(error)
+    XCTAssertTrue(
+      message == "Roundtable unavailable. Check the local service connection, then try again.",
+      "Unknown roundtable errors must use only the fixed recovery message"
+    )
+  }
+
+  func testRoundtableLocalizedErrorDescriptionIsNotEvaluated() async {
+    let counter = RoundtableDescriptionCounter()
+    let message = LocalProductStore.roundtableErrorMessage(
+      RoundtableSensitiveLocalizedError(counter: counter)
+    )
+    XCTAssertTrue(
+      message == "Roundtable unavailable. Check the local service connection, then try again.",
+      "Localized errors must not expose their original description"
+    )
+    XCTAssertEqual(counter.calls, 0, "Do not evaluate untrusted error descriptions")
+  }
+
+  func testRoundtableClientErrorsUseSafeRecoveryMessage() async {
+    for error in [
+      LocalProductClientError.invalidRequest, .invalidSocket, .invalidResponse,
+      .unavailable, .timeout, .notFound,
+    ] {
+      XCTAssertTrue(
+        LocalProductStore.roundtableErrorMessage(error)
+          == "Roundtable unavailable. Check the local service connection, then try again.",
+        "Local client errors must use the fixed recovery message"
+      )
+    }
+  }
+
+  func testRoundtableRemoteErrorKeepsSafeMessageAndStage() async {
+    let staged = LocalIPCRemoteError(
+      code: .providerAuth, recoverable: true, stage: .providerConnect,
+      safeMessage: "Reconnect the selected provider account."
+    )
+    XCTAssertEqual(
+      LocalProductStore.roundtableErrorMessage(staged),
+      "Roundtable providerAuth: Reconnect the selected provider account. (stage: provider_connect)"
+    )
+    let dispatch = LocalIPCRemoteError(
+      code: .conflict, recoverable: true, stage: .conversationDispatch,
+      safeMessage: "Review the current round before retrying."
+    )
+    XCTAssertEqual(
+      LocalProductStore.roundtableErrorMessage(dispatch),
+      "Roundtable conflict: Review the current round before retrying."
+    )
+    let unstaged = LocalIPCRemoteError(code: .providerUnavailable, recoverable: true)
+    XCTAssertEqual(
+      LocalProductStore.roundtableErrorMessage(unstaged),
+      "Roundtable providerUnavailable: "
+    )
+  }
+
   func testCredentialVaultLockAndUnlockRefreshAuthoritativeSetup() async throws {
     let client = try ProviderSetupStubClient()
     let store = LocalProductStore(client: client)
