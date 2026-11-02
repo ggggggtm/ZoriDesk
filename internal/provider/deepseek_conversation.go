@@ -367,6 +367,7 @@ func (client *DeepSeekConversationClient) RespondConfigured(
 			response.StatusCode,
 			response.Header,
 			body,
+			secret,
 		)
 	}
 	var decoded struct {
@@ -499,8 +500,9 @@ func classifyConversationHTTPFailure(
 	status int,
 	header http.Header,
 	body []byte,
+	secret []byte,
 ) error {
-	providerCode := conversationProviderErrorCode(body)
+	providerCode := conversationProviderErrorCode(body, secret)
 	retryAfterSeconds := conversationRetryAfterSeconds(header)
 	switch {
 	case status == http.StatusUnauthorized || status == http.StatusForbidden:
@@ -544,7 +546,7 @@ func classifyConversationHTTPFailure(
 	}
 }
 
-func conversationProviderErrorCode(body []byte) string {
+func conversationProviderErrorCode(body, secret []byte) string {
 	var envelope struct {
 		Error struct {
 			Code json.RawMessage `json:"code"`
@@ -564,14 +566,14 @@ func conversationProviderErrorCode(body []byte) string {
 		envelope.Code,
 		envelope.BaseResp.StatusCode,
 	} {
-		if value := safeConversationProviderCode(candidate); value != "" {
+		if value := safeConversationProviderCode(candidate, secret); value != "" {
 			return value
 		}
 	}
 	return ""
 }
 
-func safeConversationProviderCode(raw json.RawMessage) string {
+func safeConversationProviderCode(raw json.RawMessage, secret []byte) string {
 	if len(raw) == 0 {
 		return ""
 	}
@@ -582,6 +584,13 @@ func safeConversationProviderCode(raw json.RawMessage) string {
 			return ""
 		}
 		value = number.String()
+	}
+	// Provider metadata is untrusted even when its characters look like a code.
+	// Compare the decoded value before normalization so an echoed request
+	// credential cannot enter API state, replies or diagnostics. The credential
+	// is only borrowed for this request; it is never stored on the shared client.
+	if len(secret) != 0 && bytes.Contains([]byte(value), secret) {
+		return ""
 	}
 	value = strings.TrimSpace(value)
 	if len(value) == 0 || len(value) > 64 {

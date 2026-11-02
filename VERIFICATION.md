@@ -187,7 +187,17 @@ macOS 的 `swift package --package-path apps/macos dump-package` 仍是独立的
 
 ### Provider错误码为何仍需信任边界
 
-固定的安全消息不代表所有附带元数据都安全。实际链路是外部响应error.code → `ConversationFailureDetails.ProviderCode` → daemon的conversation适配 → API安全字段/失败记录 → Swift错误详情拼接或运维诊断。当前外部码只过长度/字符校验；若异常上游回填请求凭据，而该凭据恰好符合字符规则，它会被当作可展示诊断码。
+当前修复（2026-11-02，分支`fix/provider-error-credential-redaction`的dcc3aa6经再次完整及独立review，按明确授权保留历史合入main）：下文“只核验、未实现”是修复前历史。`RespondConfigured`把本次借用的secret传给`classifyConversationHTTPFailure`→`conversationProviderErrorCode`→`safeConversationProviderCode`；最后一层先解码字符串或数值候选，在TrimSpace前排除包含完整本次secret的候选，再执行原长度/字符校验。OpenAI兼容和Anthropic两处实际调用均传入凭证，不在共享client保存它，也不延长凭证租约生命周期。
+
+例如429响应中`error.code`回显本次虚构密钥，而`error.type`为`rate_limit_exceeded`：前者丢弃，后者按原候选顺序安全保留；若所有候选都回显或非法，ProviderCode留空，仍返回原`provider_rate_limit`、HTTP429、可重试和Retry-After18秒。`invalid_api_key`、数值1008及格式合法的未知码仍可诊断，不引入所有厂商错误码白名单或只按密钥前缀判断。
+
+测试先在未改生产实现时实际RED，最小修复后GREEN。四种Provider经内存HTTP夹具检查四处候选、嵌入/JSON转义/数字凭证、正常码、安全回退和共享client请求隔离；集成用实际Provider→租约→Router→持久Chat API→回复/聊天JSON/operational.jsonl，检查无密钥及原始响应message，同时保留正常码与重试字段，租约副本清零。不是只构造一个过滤函数或手工伪造attempt。
+
+`verify-startup.sh`保留原五包和全部原选择，新增Provider第六包、以上回归及原安全HTTP/诊断对照；本次普通/race各执行625条，校验器要求所有选定测试通过、无skip、无空包，而非将625硬编码为门槛。`verify-sandbox.sh`仍各107条；本地两入口普通/race与[分支CI41408923302](https://github.com/ggggggtm/ZoriDesk/actions/runs/41408923302)已实际通过，远端macOS28项也通过无skip，锁文件未改；本次合并CI单独核验。本轮review不机械重跑同一未变化的本地基线，不把引用证据当作新运行。本切片不改Swift，不宣称任意编码/截断/其他凭证检测、真实GUI或模型E2E通过。
+
+Q12整项完成依据见[TASKS验收矩阵](TASKS.md#q12让诊断可理解可操作)：只关闭原定分类/建议及已确认隐私与导出缺口，不是全应用安全审计。后续出现具体新失败才修对应回归；未承诺的Agent Input完整导出不阻塞本轮有界收口，也不因关闭任务放宽现有负向规则。
+
+修复前，固定的安全消息不代表所有附带元数据都安全。实际链路是外部响应error.code → `ConversationFailureDetails.ProviderCode` → daemon的conversation适配 → API安全字段/失败记录 → Swift错误详情拼接或运维诊断。此前外部码只过长度/字符校验；若异常上游回填请求凭据，而该凭据恰好符合字符规则，它会被当作可展示诊断码。
 
 本轮在隔离Git副本中使用真实`NewDeepSeekConversationClient.Respond`，注入假HTTPDoer：读取虚构Authorization，只在内存返回401及含同一虚构值的error.code。实际Provider解析结果及`NewLocalProductConversationDispatchErrorWithDetails`均保留该值，固定Error()/UserMessage不含该值；没有真实网络/密钥/Vault，也未执行GUI或日志出口。所确认的是条件性元数据边界缺口，不是线上泄露。
 

@@ -30,7 +30,7 @@
 | Q09 | 执行输出限制与回归测试 | done | 2026-10-28 按明确授权复核 b40a0fe 并合入 main；本地与分支 CI 普通/race 各 91 条记录通过无跳过，仅验收 Loopback 有界输出 |
 | Q10 | 取消、超时与资源回收 | done | 2026-10-29 对照下方矩阵确认既定范围已覆盖；main 98181f6 与 CI40870981799，普通/race各107条无跳过 |
 | Q11 | 可选运行工具与启动解耦 | done | 2026-10-30按明确授权复核3516dad并合入main；CI40996224960启动普通/race各449条、Sandbox各107条、macOS六项通过无跳过；合并CI另行确认 |
-| Q12 | 可操作的诊断与脱敏 | in_progress | 恢复诊断2a8b0b3经授权复核合入main，分支CI41406327459普通/race及28项XCTest成功，本次合并CI另验；下一项是模拟Provider回显请求凭据进入诊断码的条件性隐私缺口 |
+| Q12 | 可操作的诊断与脱敏 | done | dcc3aa6经授权再次review并合入main；分支CI41408923302普通/race各625条、Sandbox各107条及macOS28项无skip，本次合并CI另验；仅关闭下方既定有界验收 |
 | Q13 | Docker 后端契约设计 | backlog | Q09、Q10；接口现状核验 |
 | Q14 | Docker 最小执行闭环 | backlog | Q13；Docker 环境可用 |
 | Q15 | Docker 资源边界与故障验证 | backlog | Q14 |
@@ -167,6 +167,22 @@ Q01、Q02 为 2026-10-13 初始化文档交付；只代表维护文档，不代�
 - 验收：缺失可选工具、配置错误和已安装工具三种路径有测试，其他可用后端不被阻断。
 
 ### Q12：让诊断可理解、可操作
+
+整项验收（2026-11-02，覆盖后续历史中的in_progress/待审/下一次修复）：维护者授权再次完整review Provider分支后合main。新的独立只读review及原验收有界审计均无阻断；准确分支CI41408923302已成功，本次合并提交CI另验，若失败先修同一任务，不宣称最终通过。Q12在本次授权合入main后按以下范围标done，既有代码与测试不重复开发。
+
+| 原定验收 | 已核对实现及回归 |
+| --- | --- |
+| 区分缺工具、配置、认证、超时及运行失败 | `daemonBuildFailureReason`/`daemonFailureMessage`闭集原因、Q11健康原因码；`TestRunPublishesSafeBuildFailureReason`、`TestQ11RuntimeHealthUsesClosedPiReasonSet`及`TestOpenAICompatibleConversationClassifiesSafeProviderFailures` |
+| 操作建议与必要上下文 | `LocalProductStore`为Profile/Vault/权限/凭证/限流提供不同提示，保留HTTP、阶段、重试时间；`roundtableErrorMessage`未知错误固定恢复提示，四项Roundtable XCTest验证安全输出与类型化兼容 |
+| 已确认日志与诊断隐私缺口关闭 | `TestRunDebugBuildFailureDoesNotDiscloseDetails`覆盖路径/授权/环境值/格式化；本次`safeConversationProviderCode`排除完整请求凭证，`TestConversationProfileRouterExcludesCredentialEchoFromPersistedDiagnostics`实际验证API、回复及两个持久出口、正常码/重试与租约清零 |
+| 支持的诊断阶段进入导出，非法/敏感记录拒绝 | `LocalDiagnosticBundleExporter`原字段/结果/网关规则保留；Vault及恢复App/Daemon预览与JSON回归、非法组合和未知阶段负向测试、0600文件规则，均在28项macOS门禁内 |
+| 取消与超时语义不回退 | 不修改已验收Q10；`TestRunTreatsSignalCancellationAsGracefulBoundedOutput`及Provider超时分类回归，原Sandbox普通/race各107条继续通过 |
+
+完成边界：关闭既定诊断分类、操作建议及已证实脱敏/导出缺口，不等同全应用安全审计、任意编码/截断/其他秘密识别或真实GUI/模型E2E通过。Agent Input非Gateway segment现有拒绝契约保持，完整导出未承诺，不作为Q12必修缺口。下列旧“下一次补恢复/Provider/Vault”等是历史过程，不再触发重复开发。合并CI核验后下次直接按原队列核对Q06真实用户可见品牌，Q04随实现同步；未来分支仍不得自动合main。
+
+当前切片（2026-11-02，优先于下方历史记录）：`fix/provider-error-credential-redaction`基于main184a68d，只修实际请求凭证回显到Provider诊断码。回归先在旧生产实现失败，随后在解码候选进入API前排除包含完整本次凭证的值，逐项继续原候选回退，无可用值则留空；正常字符串/数字码、未知但格式合法码、HTTP分类与重试不改。OpenAI兼容和Anthropic共享路径均覆盖，不持久保存凭证或改诊断字段。
+
+实际夹具覆盖Provider→租约/Router→持久Chat API→用户回复/聊天JSON/运维JSONL，凭证不进入这些出口且租约副本清零；正常429、Retry-After18秒和安全码保留。本地启动/Provider普通与race各625条、Sandbox各107条通过无skip，原CI入口追加第六个Provider包，旧选择不删。分支须独立复核、推送后实际CI成功再交付，等待用户审查，不合main。范围不含任意编码/截断/其他秘密扫描；Agent Input仍仅支持范围待确认，不作为本切片必修项，不重复已验收的恢复/Vault/圆桌/启动日志或Q09/Q10/Q11。
 
 最新验收（2026-11-02）：恢复诊断`2a8b0b3`完整六文件再次及独立review无阻断，分支CI41406327459成功后，按明确授权保留历史合入main；合并CI另行确认。本节后续“待审/下一次补恢复”均为历史过程，不再重复两阶段、Vault、圆桌、启动日志或Q09/Q10/Q11。Q12暂仍in_progress。
 

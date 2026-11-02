@@ -182,7 +182,7 @@ func (client *AnthropicConversationClient) RespondConfigured(
 		return "", newConversationFailure("provider_http", "state_unavailable", true)
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return "", classifyConversationHTTPFailure(response.StatusCode, response.Header, body)
+		return "", classifyConversationHTTPFailure(response.StatusCode, response.Header, body, secret)
 	}
 	var decoded struct {
 		Type       string `json:"type"`

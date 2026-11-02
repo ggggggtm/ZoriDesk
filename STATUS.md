@@ -16,8 +16,8 @@
 | --- | --- |
 | 公开仓库初始化 | 已完成；2026-11-02通过GitHub原生操作脱离Fork网络，地址/ID、12分支SHA及320个可达提交未变，必要来源与许可保留 |
 | 项目介绍 | 已发布 README，提交 510fdc956d74e533eb6b43551e1fffc3d10d24ef |
-| 运行时代码 | 启动日志、圆桌、Vault及Agent/工具恢复诊断切片均已按明确授权复核合入main，不重复开发；Q12仍in_progress，下一确认项为模拟上游凭证回显进入ProviderCode的隐私边界 |
-| 构建、测试、端到端验证 | 恢复分支2a8b0b3的CI41406327459实际成功：Sandbox普通/race各107条、启动各498条、macOS28项无skip；本次合并CI另验。本地普通/TSan Core探针不是完整XCTest或全应用证明，完整GUI、模型E2E及全仓未验证 |
+| 运行时代码 | Provider凭证回显修复dcc3aa6经再次完整及独立复核，按维护者授权保留历史合入main；Q12按下方既定有界验收关闭，不代表全应用安全审计完成 |
+| 构建、测试、端到端验证 | 分支CI41408923302实际成功：启动/Provider普通与race各625条、Sandbox各107条、macOS28项，无skip；本次合并CI单独核验，失败则继续同一修复、不得作最终通过声明。完整GUI、模型E2E及全仓未验证 |
 | 应用与服务内部名称 | 仍有 Loom / loomd 等既有标识，尚未完成品牌迁移 |
 | 本地开发与提交环境 | 已建立独立 checkout；SSH 认证到正确所有者，仓库级个人提交身份已配置；Q00 记录已真实推送并核对远端 SHA |
 | Docker / Kubernetes 后端 | 后续规划，不能写成已交付能力 |
@@ -34,7 +34,7 @@
 ## 下一步
 
 1. Q00、Q03 经复核并按维护者明确授权合入 main，状态 done；不重复初始化或创建模板。此授权仅针对这两个任务，不改变以后定时维护的分支审查规则。
-2. 已验收切片不重复；先确认本次恢复诊断合并CI。Q12下一小切片针对已在隔离假HTTP场景复现的ProviderCode凭证回显，先补回归并明确安全回退，保留合法码/HTTP分类/固定提示；Agent Input导出仅是支持范围待确认，不直接扩展非网关字段。后续分支仍须审查，不自动合并。
+2. Q12既定分类、操作建议及已确认脱敏/导出缺口已验收；先核验本次合并CI，再按原队列推进Q06用户可见品牌核对，Q04继续随代码补充。不要重复Q09/Q10/Q11或Q12历史修复。Agent Input完整导出仍未承诺，不扩展非网关字段或把有界完成扩大为全应用安全保证；后续改动仍新分支待审、不自动合main。
 3. Q04 随代码和测试同步补充真实路径与关键函数，不阻塞 Q05/Q09；品牌与兼容性任务后置，原有验收、安全边界和分支审查规则保持不变。
 4. 执行前检查实际分支、未提交改动和待审查工作；有未完成任务先收尾，不机械开始新任务。
 
@@ -314,6 +314,21 @@ git diff --exit-code -- go.mod go.sum
 - 新确认的条件性隐私缺口：在隔离的当前Git归档副本中，使用实际`NewDeepSeekConversationClient.Respond`与假HTTPDoer，把虚构请求凭据回填到401响应的`error.code`；实际`ConversationFailureDetails.ProviderCode`等于虚构凭据，`NewLocalProductConversationDispatchErrorWithDetails`也接受并保留。固定`Error()`/`UserMessage`没有该值，因此问题在不可信诊断元数据，不是所有安全提示都失效。没有真实网络、真实密钥、Vault或GUI操作，也不称线上泄露事件。
 - 源码确认下游API会保存ProviderCode，daemon诊断和Swift错误详情有对应出口；本轮动态验证到Provider/API边界，未把源码追踪当作已执行GUI/日志出口。下一验收应先补上游回显虚构凭据回归，至少阻止已知请求凭据进入安全诊断码，同时明确未知码回退，保留合法字符串/数值码、HTTP分类和retry字段兼容；不能只按某个密钥前缀猜测，不扩展为全应用秘密扫描。
 - Agent Input的stage/segment结构与当前导出规则不匹配，但现有测试明确拒绝非Gateway segment，限定核验中未找到必须完整导出Agent Input的支持承诺。因此只是范围待确认，不列为必须修完的既有缺陷，也不全局放开字段；若要支持，需另定有限类型与字段契约。Q12收口应对照原有分类/建议/脱敏验收，不因其他未承诺阶段无限扩白名单。本轮未实现上述下一切片，Q12暂仍in_progress，后续不自动合main。
+
+## Q12 Provider请求凭证回显边界修复：2026-11-02
+
+- 基准main`184a68d`；分支`fix/provider-error-credential-redaction`。先补实际HTTP夹具及持久API回归，在未修改生产代码时实际失败，再做最小修复。两个共享HTTP分类调用方（OpenAI兼容及Anthropic）传入本次借用凭证；候选JSON解码后、TrimSpace前排除包含完整本次凭证的值，再按原顺序选择安全候选，无可用候选则为空。
+- 保留原HTTP分类、固定安全提示、Retryable/Retry-After、字符串/数字及未知但格式合法的错误码；不按sk-等前缀猜测，不存共享client状态，不扩展诊断模型或权限。四种Provider、四种候选字段、嵌入/JSON转义/数字凭证、正常码和安全候选回退均有测试。
+- 集成回归使用真实Provider、凭证租约、Router、PersistentChat API及diagnostics.wrap，读取实际聊天JSON和operational.jsonl，核对回复、attempt、日志无回显凭证/原始message，保留429与18秒重试提示，并检查租约副本清零和无额外凭证读取。仅虚构凭证及内存假HTTP，无外网、模型或真实Vault。
+- 本地Go1.26.2：定向RED→GREEN，`verify-startup.sh`普通/race各625条、`verify-sandbox.sh`普通/race各107条，无skip；格式、依赖校验、目标编译/vet、锁文件和差异检查通过。CI入口保留原五包和原测试，追加Provider第六包与定向控制，继续拒绝skip/空选。完整生产/测试/脚本差异已独立只读复核；远端CI需推送后实际核验，分支待审不是done。
+- 边界是完整本次请求凭证的回显，包括JSON转义解码及嵌入；不声称过滤截断/任意编码/其他请求秘密或全应用日志。Swift源码未改，macOS原28项仍须由CI实际执行，不把本地Go通过当作XCTest通过。已验收的恢复、Vault、圆桌、启动日志及Q09/Q10/Q11不重复。
+
+## Q12 授权合并与既定验收收口：2026-11-02
+
+- 维护者明确要求重新review `fix/provider-error-credential-redaction`，无阻断后合main、确认合并CI并判断Q12完成。完整九文件再次及新的独立只读复核无阻断，另以独立有界审计对照原Q12验收；当前无已证实且未处理的范围内阻断项，验收矩阵见[TASKS.md](TASKS.md#q12让诊断可理解可操作)。这不是全仓秘密扫描或真实GUI/模型E2E验收。
+- 已重新读取dcc3aa6的[分支CI41408923302](https://github.com/ggggggtm/ZoriDesk/actions/runs/41408923302)准确SHA、成功状态及原始日志：Linux普通/race启动与Provider各625条、Sandbox各107条；macOS28项XCTest，无skip。本轮引用未变化源码的既有本地证据，不伪称重新运行；本次合并提交CI另验，不能借用分支成功替代。
+- 按本次明确授权保留历史合并。相对已review的dcc3aa6额外只有三份根文档验收/队列说明，运行代码、测试、脚本、锁文件及CI工作流不再改变。Q12完成仅表示原定诊断分类、操作建议与已确认隐私/导出缺口已验收；后续若出现具体回归再单独修复，不每轮重新盘点或无界扩白名单。
+- 下方及前文“Q12仍in_progress”“下一次补Provider/恢复/Vault”“分支待审”均保留为当时历史，由本节和队列总览覆盖。Agent Input完整导出、任意编码/截断/其他秘密检测不属于当前保证。下一定时任务按原顺序核对Q06真实品牌遗留，仍先回归/检查、按类型主题分支交付，等待用户审查；本次合并授权不延伸到未来分支。
 
 ## 状态维护约定
 

@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -432,6 +433,136 @@ func TestOpenAICompatibleConversationClassifiesSafeProviderFailures(t *testing.T
 				!errors.Is(err, ErrOpenAICompatibleConversationUnavailable) ||
 				strings.Contains(err.Error(), "must never escape") {
 				t.Fatalf("failure=%#v ok=%v error=%v", failure, ok, err)
+			}
+		})
+	}
+}
+
+func TestOpenAICompatibleConversationExcludesRequestCredentialFromProviderCode(t *testing.T) {
+	for _, providerID := range []string{"deepseek", "kimi", "minimax"} {
+		t.Run(providerID, func(t *testing.T) {
+			testConversationProviderCodeCredentialBoundary(t, providerID)
+		})
+	}
+}
+
+// All credentials are synthetic. Responses derive echoes from the actual
+// outgoing header, not from a separate sanitizer fixture or a real service.
+func testConversationProviderCodeCredentialBoundary(t *testing.T, providerID string) {
+	t.Helper()
+	const fakeSecret = "fixture-credential-123"
+	cases := []struct {
+		name, body, secret, want string
+	}{
+		{name: "error code", body: `{"error":{"code":"ECHO"}}`},
+		{name: "error type", body: `{"error":{"type":"ECHO"}}`},
+		{name: "top code", body: `{"code":"ECHO"}`},
+		{name: "base status", body: `{"base_resp":{"status_code":"ECHO"}}`},
+		{name: "embedded", body: `{"error":{"code":"prefix-ECHO-suffix"}}`},
+		{name: "escaped JSON", body: `{"error":{"code":"fixture-credential-\u0031\u0032\u0033"}}`},
+		{name: "surrounding whitespace", body: `{"error":{"code":"  ECHO  "}}`},
+		{name: "numeric credential", secret: "246810", body: `{"error":{"code":246810}}`},
+		{name: "safe type fallback", body: `{"error":{"code":"ECHO","type":"authentication_error"}}`, want: "authentication_error"},
+		{name: "safe top fallback", body: `{"error":{"code":"ECHO","type":"ECHO"},"code":"rate_limit_exceeded"}`, want: "rate_limit_exceeded"},
+		{name: "safe base fallback", body: `{"error":{"code":"ECHO","type":"ECHO"},"code":"ECHO","base_resp":{"status_code":1008}}`, want: "1008"},
+		{name: "all candidates echo", body: `{"error":{"code":"ECHO","type":"ECHO"},"code":"ECHO","base_resp":{"status_code":"ECHO"}}`},
+		{name: "normal string", body: `{"error":{"code":"rate_limit_exceeded"}}`, want: "rate_limit_exceeded"},
+		{name: "normal numeric", body: `{"base_resp":{"status_code":1008}}`, want: "1008"},
+		{name: "normal numeric string", body: `{"code":"1008"}`, want: "1008"},
+		{name: "unknown bounded code", body: `{"error":{"code":"Vendor.Future-Code_42"}}`, want: "Vendor.Future-Code_42"},
+		{name: "not a key prefix blacklist", body: `{"code":"sk-vendor-status"}`, want: "sk-vendor-status"},
+		{name: "unknown malformed", body: `{"error":{"code":"bad code / path"}}`},
+		{name: "unknown object", body: `{"error":{"code":{"raw":"ECHO"}}}`},
+		{name: "invalid JSON", body: `{"error":`},
+		{name: "long code", body: `{"code":"` + strings.Repeat("x", 65) + `"}`},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			secret := test.secret
+			if secret == "" {
+				secret = fakeSecret
+			}
+			var observed *http.Request
+			client := conversationCredentialBoundaryClient(t, providerID, deepSeekConversationDoerFunc(func(request *http.Request) (*http.Response, error) {
+				observed = request
+				echo := strings.TrimPrefix(request.Header.Get("Authorization"), "Bearer ")
+				if providerID == "anthropic" {
+					echo = request.Header.Get("x-api-key")
+				}
+				if echo != secret {
+					t.Fatal("request did not carry the synthetic credential")
+				}
+				return &http.Response{
+					StatusCode: http.StatusTooManyRequests, Request: request,
+					Header: http.Header{"Retry-After": []string{"18"}},
+					Body:   io.NopCloser(strings.NewReader(strings.ReplaceAll(test.body, "ECHO", echo))),
+				}, nil
+			}))
+			_, err := client.Respond(context.Background(), []ConversationMessage{{Role: "user", Content: "hello"}}, []byte(secret))
+			failure, ok := ConversationFailureDetails(err)
+			if !ok || failure.ProviderCode != test.want || failure.Stage != "provider_rate_limit" ||
+				failure.Code != "provider_rate_limit" || failure.HTTPStatus != 429 ||
+				!failure.Retryable || failure.RetryAfterSeconds != 18 ||
+				failure.UserMessage != "Provider rate limit reached." ||
+				!errors.Is(err, ErrProviderConversationUnavailable) {
+				t.Fatal("credential boundary or original HTTP/retry classification not preserved")
+			}
+			encoded, marshalErr := json.Marshal(failure)
+			if marshalErr != nil || strings.Contains(string(encoded), secret) || strings.Contains(err.Error(), secret) {
+				t.Fatal("request credential escaped in failure details or error text")
+			}
+			if observed == nil || observed.Header.Get("Authorization") != "" || observed.Header.Get("x-api-key") != "" {
+				t.Fatal("request credential header was retained")
+			}
+		})
+	}
+}
+
+type conversationCredentialBoundaryResponder interface {
+	Respond(context.Context, []ConversationMessage, []byte) (string, error)
+}
+
+func conversationCredentialBoundaryClient(t *testing.T, providerID string, doer HTTPDoer) conversationCredentialBoundaryResponder {
+	t.Helper()
+	config := OpenAICompatibleConversationConfig{Client: doer, Timeout: time.Second, MaxResponseBytes: 4096}
+	var client conversationCredentialBoundaryResponder
+	var err error
+	switch providerID {
+	case "deepseek":
+		client, err = NewDeepSeekConversationClient(config)
+	case "kimi":
+		client, err = NewKimiConversationClient(config)
+	case "minimax":
+		client, err = NewMiniMaxConversationClient(config)
+	case "anthropic":
+		client, err = NewAnthropicConversationClient(AnthropicConversationConfig{Client: doer, Timeout: time.Second, MaxResponseBytes: 4096})
+	default:
+		t.Fatal("unknown test provider")
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	return client
+}
+
+func TestOpenAICompatibleConversationProviderCodeCredentialCheckIsRequestScoped(t *testing.T) {
+	for _, providerID := range []string{"deepseek", "kimi", "minimax", "anthropic"} {
+		t.Run(providerID, func(t *testing.T) {
+			const echo = "fixture-first-credential"
+			client := conversationCredentialBoundaryClient(t, providerID, deepSeekConversationDoerFunc(func(request *http.Request) (*http.Response, error) {
+				return &http.Response{StatusCode: http.StatusUnauthorized, Request: request,
+					Body: io.NopCloser(strings.NewReader(`{"error":{"code":"` + echo + `"}}`))}, nil
+			}))
+			for index, secret := range []string{echo, "fixture-other-credential", echo} {
+				_, err := client.Respond(context.Background(), []ConversationMessage{{Role: "user", Content: "hello"}}, []byte(secret))
+				failure, ok := ConversationFailureDetails(err)
+				want := ""
+				if index == 1 {
+					want = echo // Not this request's credential; no global mutable blacklist.
+				}
+				if !ok || failure.ProviderCode != want || failure.Retryable || failure.Code != "provider_auth" {
+					t.Fatal("request-scoped credential filtering or auth classification changed")
+				}
 			}
 		})
 	}
