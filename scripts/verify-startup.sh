@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Q11 account-free startup/assembly regressions, not installed-app or model E2E.
+# Account-free startup/assembly and Provider failure regressions, not model E2E.
 set -euo pipefail
 
 race_args=()
@@ -18,7 +18,7 @@ cd "$repo_root"
 export GOTOOLCHAIN=local GOWORK=off GOFLAGS=-mod=readonly GOPROXY=off
 go version
 
-packages=(./cmd/loomd ./internal/app ./internal/api ./internal/runtime/piadapter ./internal/runtime/discoveryscan)
+packages=(./cmd/loomd ./internal/app ./internal/api ./internal/runtime/piadapter ./internal/runtime/discoveryscan ./internal/provider)
 # Keep formatting scoped to this slice; inherited unrelated files are not rewritten.
 unformatted=$(gofmt -l \
   cmd/loomd/local_app_service.go cmd/loomd/run.go cmd/loomd/run_test.go \
@@ -26,6 +26,9 @@ unformatted=$(gofmt -l \
   cmd/loomd/product_composition_agent_runtime.go cmd/loomd/optional_runtime_test.go \
   internal/app/runtime_daemon.go internal/app/optional_runtime_test.go \
   internal/api/local_product_read.go internal/api/optional_runtime_health_test.go \
+  cmd/loomd/product_conversation_profiles_test.go \
+  internal/provider/deepseek_conversation.go internal/provider/deepseek_conversation_test.go \
+  internal/provider/anthropic_conversation.go internal/provider/anthropic_conversation_test.go \
   internal/runtime/piadapter/process_runner_test.go)
 if [[ -n "$unformatted" ]]; then
   printf 'Unformatted files (not modified):\n%s\n' "$unformatted" >&2
@@ -37,7 +40,7 @@ go vet "${packages[@]}"
 
 # Fixed, reviewed fixture-only selection: no user accounts, installed tools, model
 # servers or opt-in live gates. The checker rejects skipped or empty packages.
-tests='^(TestQ11.*|TestRun.*|TestDaemonBuildFailureNestedAmbiguityFailsClosed|TestExpandLocalAppServiceArgs.*|TestOptionalCredentialImportSourceFailsClosedOnUnsafePath|TestPrepareLocalAppInvocation.*|TestParseLocalAppServiceInvocation.*|TestMissionExecutionConfigFromDaemonBuild.*|TestLocalRuntimeObservationDaemon.*|TestNextRuntimeObservationSequence|TestPiLocalRuntimeProbeFactory.*|TestPiMetadataProcessRunnerSuccessIsolationAndCleanup|TestPiMetadataProcessRunnerMaterializesBoundLocalCatalog|TestDiscoverConfiguredRuntimes.*|TestProductSetupRemainsAvailableWhenNoRuntimeCanBuildATeam|TestProductDaemonColdStartAdmitsAllNativeProviderRuntimes|TestContainableProductObserverTimeoutRejectsMixedFailureChains|TestProductDaemonContainsExactPiMetadataTimeoutWithoutStoppingIPC|TestObserverFailureReasonIsClosedTypedAndNonDisclosing)$'
+tests='^(TestQ11.*|TestRun.*|TestDaemonBuildFailureNestedAmbiguityFailsClosed|TestExpandLocalAppServiceArgs.*|TestOptionalCredentialImportSourceFailsClosedOnUnsafePath|TestPrepareLocalAppInvocation.*|TestParseLocalAppServiceInvocation.*|TestMissionExecutionConfigFromDaemonBuild.*|TestLocalRuntimeObservationDaemon.*|TestNextRuntimeObservationSequence|TestPiLocalRuntimeProbeFactory.*|TestPiMetadataProcessRunnerSuccessIsolationAndCleanup|TestPiMetadataProcessRunnerMaterializesBoundLocalCatalog|TestDiscoverConfiguredRuntimes.*|TestProductSetupRemainsAvailableWhenNoRuntimeCanBuildATeam|TestProductDaemonColdStartAdmitsAllNativeProviderRuntimes|TestContainableProductObserverTimeoutRejectsMixedFailureChains|TestProductDaemonContainsExactPiMetadataTimeoutWithoutStoppingIPC|TestObserverFailureReasonIsClosedTypedAndNonDisclosing|TestOpenAICompatibleConversation.*|TestDeepSeekConversation.*|TestDeepSeekReasoning.*|TestMiniMaxConversation.*|TestAnthropicConversation.*|TestConversationProfileRouterExcludesCredentialEchoFromPersistedDiagnostics|TestConversationProfileRouterPreservesSafeProviderHTTPFailure|TestProductOperationalDiagnosticsUsesConversationAttemptTerminalFailure)$'
 report=$(mktemp "${TMPDIR:-/tmp}/zoridesk-startup-tests.XXXXXX")
 trap 'rm -f -- "$report"' EXIT
 trap 'exit 130' INT
@@ -46,5 +49,6 @@ go test ${race_args[@]+"${race_args[@]}"} -json -run "$tests" -count=1 -timeout=
 module=$(go list -m)
 go run ./internal/testreport \
   "$module/cmd/loomd" "$module/internal/app" "$module/internal/api" \
-  "$module/internal/runtime/piadapter" "$module/internal/runtime/discoveryscan" < "$report"
-echo "PASS: bounded startup/assembly regressions only; not installed app or model E2E."
+  "$module/internal/runtime/piadapter" "$module/internal/runtime/discoveryscan" \
+  "$module/internal/provider" < "$report"
+echo "PASS: bounded startup/assembly and Provider failure regressions; not installed app or model E2E."

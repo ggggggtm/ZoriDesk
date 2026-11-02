@@ -2,9 +2,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +16,7 @@ import (
 	"loom-pi-rebuild/internal/contextcapsule"
 	"loom-pi-rebuild/internal/credentials"
 	credentialvault "loom-pi-rebuild/internal/credentials/vault"
+	"loom-pi-rebuild/internal/localipc"
 	"loom-pi-rebuild/internal/projection"
 	"loom-pi-rebuild/internal/provider"
 	"loom-pi-rebuild/internal/work"
@@ -625,6 +629,124 @@ func TestConversationProfileRouterPreservesSafeProviderHTTPFailure(t *testing.T)
 		failure.UserMessage != "Provider account has insufficient balance." ||
 		strings.Contains(err.Error(), "must never escape") {
 		t.Fatalf("failure=%#v ok=%v error=%v", failure, ok, err)
+	}
+}
+
+func TestConversationProfileRouterExcludesCredentialEchoFromPersistedDiagnostics(t *testing.T) {
+	const fakeSecret = "fixture-router-credential-123"
+	for _, test := range []struct{ name, code, want string }{
+		{name: "credential echo", code: fakeSecret},
+		{name: "normal string", code: "rate_limit_exceeded", want: "rate_limit_exceeded"},
+		{name: "normal numeric", code: "1008", want: "1008"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			credentialStore := &profileConversationStore{secret: []byte(fakeSecret)}
+			client, err := provider.NewDeepSeekConversationClient(provider.DeepSeekConversationConfig{
+				Client: profileConversationHTTPDoerFunc(func(request *http.Request) (*http.Response, error) {
+					if request.Header.Get("Authorization") != "Bearer "+fakeSecret {
+						t.Fatal("router did not lease the synthetic request credential")
+					}
+					return &http.Response{StatusCode: http.StatusTooManyRequests, Request: request,
+						Header: http.Header{"Retry-After": []string{"18"}},
+						Body:   io.NopCloser(strings.NewReader(`{"error":{"code":"` + test.code + `","message":"raw-private-provider-message"}}`))}, nil
+				}),
+				Timeout: time.Second, MaxResponseBytes: 4096,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			router, err := newProductConversationProfileRouter(nil, func(string) []projection.ProviderCredentialRecord {
+				return []projection.ProviderCredentialRecord{{
+					ProviderID: "deepseek", ProviderAccountID: "deepseek.primary",
+					CredentialReference: "credential-ref-provider-code-test", Revision: 6,
+					Status: "verified", AuthMode: "brokered",
+				}}
+			}, profileConversationLeasing(t, credentialStore), client)
+			if err != nil {
+				t.Fatal(err)
+			}
+			root := t.TempDir()
+			chatPath := filepath.Join(root, "chat.json")
+			now := func() time.Time { return time.Date(2026, 11, 2, 1, 0, 0, 0, time.UTC) }
+			chat, err := api.NewPersistentLocalProductChatAPI(chatPath, now, router)
+			if err != nil {
+				t.Fatal(err)
+			}
+			stateDir := filepath.Join(root, "state")
+			if err := os.Mkdir(stateDir, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			diagnostics, err := newProductOperationalDiagnosticStore(filepath.Join(stateDir, "loom.db"), 4<<10, now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			const incidentID = "loom-chat-33333333-3333-4333-8333-333333333333"
+			handler := diagnostics.wrap(localipc.HandlerFunc(func(ctx context.Context, _ localipc.Request) localipc.Response {
+				thread, sendErr := chat.SendMessage(ctx, api.LocalProductChatMessageRequest{
+					ThreadID: "credential-code-test", ProfileID: provider.DeepSeekConversationProfileID(6),
+					Content: "hello", IncidentID: incidentID,
+				})
+				if sendErr != nil {
+					t.Fatal(sendErr)
+				}
+				result, marshalErr := json.Marshal(thread)
+				if marshalErr != nil {
+					t.Fatal(marshalErr)
+				}
+				return localipc.Response{OK: true, Result: result}
+			}))
+			response := handler.Handle(context.Background(), localipc.Request{
+				RequestID: incidentID, Method: "chat_message",
+				Params: json.RawMessage(`{"thread_id":"credential-code-test","profile_id":"conversation-deepseek-r6"}`),
+			})
+			var thread api.LocalProductChatThread
+			if !response.OK || json.Unmarshal(response.Result, &thread) != nil || len(thread.Attempts) != 1 {
+				t.Fatal("missing actual API terminal attempt")
+			}
+			attempt := thread.Attempts[0]
+			if attempt.Status != "failed" || attempt.FailureCode != "provider_rate_limit" ||
+				attempt.FailureStage != "provider_rate_limit" || attempt.HTTPStatus != 429 ||
+				attempt.ProviderCode != test.want || !attempt.Retryable || attempt.RetryAfterSeconds != 18 ||
+				attempt.FailureMessage != "Provider rate limit reached." || attempt.IncidentID != incidentID {
+				t.Fatal("API attempt changed credential, failure classification or retry fields")
+			}
+			wantReply := "Provider rate limit reached. HTTP 429"
+			if test.want != "" {
+				wantReply += " · " + test.want
+			}
+			wantReply += " · retry after 18s"
+			if thread.Messages[len(thread.Messages)-1].Content != wantReply {
+				t.Fatal("actual user reply changed safe code or retry advice")
+			}
+			persisted, err := os.ReadFile(chatPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			logged, err := os.ReadFile(filepath.Join(root, "diagnostics", "operational.jsonl"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var record productOperationalDiagnosticRecord
+			if json.Unmarshal(logged, &record) != nil || record.Result != "failed" ||
+				record.Stage != "provider_rate_limit" || record.ErrorCode != "provider_rate_limit" ||
+				record.HTTPStatus != 429 || record.ProviderErrorCode != test.want ||
+				!record.Retryable || record.RetryAfterSeconds != 18 {
+				t.Fatal("actual diagnostic log lost safe terminal failure or retry metadata")
+			}
+			for _, sink := range [][]byte{response.Result, persisted, logged} {
+				if strings.Contains(string(sink), fakeSecret) || strings.Contains(string(sink), "raw-private-provider-message") {
+					t.Fatal("credential or raw provider message reached API, persisted chat or diagnostic log")
+				}
+			}
+			for _, value := range credentialStore.lastRead {
+				if value != 0 {
+					t.Fatal("leased credential copy was not wiped")
+				}
+			}
+			if credentialStore.reads != 1 {
+				t.Fatal("provider failure unexpectedly retried credential access")
+			}
+		})
 	}
 }
 

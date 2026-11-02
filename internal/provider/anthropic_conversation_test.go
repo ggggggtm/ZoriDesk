@@ -79,6 +79,10 @@ func TestAnthropicConversationUsesFixedBoundedMessagesContract(t *testing.T) {
 	}
 }
 
+func TestAnthropicConversationExcludesRequestCredentialFromProviderCode(t *testing.T) {
+	testConversationProviderCodeCredentialBoundary(t, "anthropic")
+}
+
 func TestAnthropicConversationKeepsLoomContextInSystemField(t *testing.T) {
 	doer := &anthropicConversationDoer{}
 	client, err := NewAnthropicConversationClient(AnthropicConversationConfig{
