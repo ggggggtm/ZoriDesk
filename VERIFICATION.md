@@ -1,6 +1,6 @@
 # 无账号的 Sandbox 与启动验证入口
 
-状态：Q05/Q09/Q10 的有界 Sandbox 验证、Q11 启动回归与 Q12 启动诊断脱敏切片，不代表完整应用通过验收。运行结果见 [STATUS.md](STATUS.md)，任务依赖见 [TASKS.md](TASKS.md)。
+状态：Q05/Q09/Q10 的有界 Sandbox 验证、Q11 启动回归与 Q12 诊断脱敏/导出切片，不代表完整应用通过验收。运行结果见 [STATUS.md](STATUS.md)，任务依赖见 [TASKS.md](TASKS.md)。
 
 ## 怎么运行
 
@@ -123,7 +123,7 @@ bash scripts/verify-startup-ui.sh
 
 [verify-startup.sh](scripts/verify-startup.sh) 先检查格式、锁定依赖、目标包编译和 vet，再执行固定的无账号回归集合并用原 `testreport` 校验器拒绝 skip/空包/未完成测试。覆盖首次启动组合、互斥参数、共享目录保护、实际服务构造到本地 IPC、原生适配器装配、历史 Pi 候选过滤、空观察重启及错误分类；测试使用临时库、测试工具脚本和假凭证，不调用真实模型。
 
-[verify-startup-ui.sh](scripts/verify-startup-ui.sh) 固定执行10项XCTest：保留原六项Pi原因码/分页/超时降级回归，新增四项Roundtable未知错误脱敏与类型化错误兼容回归。逐项要求实际通过记录，拒绝跳过和空选；它使用假客户端与虚构错误，不启动真实后端或图形界面。`MissionWorkbench` 的长表达式只做等价分段以解除编译器类型推断瓶颈。
+[verify-startup-ui.sh](scripts/verify-startup-ui.sh) 固定执行25项XCTest：原六项Pi原因码/分页/超时降级、四项Roundtable错误兼容，加上完整15项诊断导出测试（原12项及本次3项凭证阶段回归）。逐项要求实际通过记录，拒绝跳过和空选；它使用假客户端、临时日志与虚构错误，不启动真实后端或图形界面。`MissionWorkbench` 的长表达式只做等价分段以解除编译器类型推断瓶颈。
 
 范围：Pi/Node 的启动耦合，不承诺任意第三方 CLI 错误均互不影响。显式错误配置仍拒绝；其他工具自己的依赖仍需满足。缺少 Pi/Node 的操作建议写入现有 daemon 控制台日志，不声称已新增 UI 安装向导。SwiftPM 应用编译已在本机通过，XCTest 的实际运行环境与结果见 STATUS；桌面操作、安装/签名/迁移、真实账号/E2E、工具修复后的自动热恢复未验证。原有 Sandbox 107 条回归不能替代本节的启动验证。
 
@@ -160,3 +160,13 @@ macOS 的 `swift package --package-path apps/macos dump-package` 仍是独立的
 类型化`LocalIPCRemoteError`继续沿原code/safeMessage/stage展示，包括conversationDispatch不追加stage的既有规则；本切片不声称能过滤任意错误中所有字段，不改远端协议或授权。成功操作清除旧错误的原路径未变。
 
 本地使用`swift build`编译真实Core模块，再链接该模块对象调用实际函数的独立探针，虚构敏感NSError在旧实现失败、修复后通过，并验证类型化结果兼容。该探针不是XCTest，不能代替macOS CI；CLT缺少XCTest时明确记录限制。四项新增XCTest及原六项都在同一验证脚本逐项核验，Go普通/race仍由原CI执行。检查范围是这个界面出口，不等于全应用脱敏或真实GUI/E2E验收。
+
+### 凭证诊断为什么写入成功却导不出来
+
+链路：Go凭证broker/Swift类型化错误 → 原诊断生产者 → 私有JSONL日志 → `LocalDiagnosticBundleExporter.readEvents` → 字段/结构/`safeEvent`与`safeStage`校验 → 预览 → `export`写出0600的JSON。导出器不读取Vault中的密钥、不给任何人新增凭证权限，只筛选已有诊断记录；存储格式与生产者均不变。
+
+例如解锁失败写下incidentID、`vault_open`、`credential_unavailable`：旧白名单不含这个阶段，故在预览前整条被丢弃，支持人员便无法用incidentID关联故障。仅加入Go的`productOperationalDiagnosticStage`与Swift的`LocalIPCRemoteError.Stage`共同支持的15个凭证阶段（9个Vault、3个租约、3个迁移），原事件就能进入预览和JSON；不把所有枚举或任意前缀自动放行。
+
+实际覆盖见[LocalDiagnosticBundleTests.swift](apps/macos/Tests/LoomLocalAppTests/LocalDiagnosticBundleTests.swift)：App通过真实`recordCredential`写30条，Daemon形状日志30条，核对来源/ID/阶段/耗时/结果/错误/可重试字段及JSON往返。额外保留provider与gateway兼容性；21种非法记录仍排除，包含未知阶段、非法结果组合、混合网关字段与敏感/嵌套原文。导出权限仍为0600，文件安全检查、网关规则、字段白名单、容量限制不变。
+
+本地真实Core模块探针先失败（合法60条全部丢弃），修复后通过（合法60条保留、15条负向记录拒绝、JSON/权限一致）；这与新增XCTest的21种负向矩阵不是同一个计数。macOS CI通过既有脚本实际执行全部25项XCTest，不能把本地编译/探针或测试源码语法检查当作XCTest成功。原Linux普通/race检查保留；分支CI结果在推送后核验，Q12仍未整项验收，不自动合并main。

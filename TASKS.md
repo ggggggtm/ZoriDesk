@@ -168,6 +168,8 @@ Q01、Q02 为 2026-10-13 初始化文档交付；只代表维护文档，不代�
 
 ### Q12：让诊断可理解、可操作
 
+当前切片（2026-11-02）：`fix/diagnostic-bundle-stages`先补三项XCTest，再仅给`safeStage`补15个既有Vault/租约/迁移阶段。预览/JSON保留合法事件，未知阶段、非法结果组合和敏感字段继续拒绝；已有12项导出与10项界面回归保留，合计25项逐项核验。本地实际Core探针先红后绿、Swift编译通过；CLT无XCTest，推送后须核验macOS实际XCTest与既有Linux普通/race。分支待审，不合main，Q12仍in_progress；下次先处理本切片反馈，旧启动日志/圆桌/可选工具不重复开发。下方“下一次补Vault”是本次修复前的核验记录。
+
 最新验收（2026-11-02）：圆桌分支06bca11经再次完整及独立review无阻断，按明确授权保留历史合入main；分支CI41380833279普通/race与macOS十项无跳过通过，合并CI单独确认。本切片不再待审，不重复启动日志与圆桌脱敏。
 
 剩余真实缺口：`LocalDiagnosticBundleExporter.safeStage`遗漏生产者已有Vault阶段。真实Swift存储写入两条合法provider_connect/vault_open事件，实际预览只保留前者、跳过Vault；下一次先补“合法Vault记录保留、未知/非法阶段仍拒绝”的预览/导出JSON回归，再作最小修复，并核对租约/迁移阶段的实际生产者覆盖。Provider error.code的语义过滤仅是待核验协议线索，不将其说成已复现泄露。Q12仍in_progress，后续类型/主题分支待审，不自动合并或直接跳下一大项。
