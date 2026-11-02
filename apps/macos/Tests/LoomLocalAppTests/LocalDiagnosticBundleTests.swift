@@ -4,6 +4,161 @@ import XCTest
 @testable import LoomLocalAppCore
 
 final class LocalDiagnosticBundleTests: XCTestCase {
+    // These credential stages are emitted by the Go credential broker and are
+    // decoded by LocalIPCRemoteError.Stage; they are not arbitrary log strings.
+    private let credentialStages: [LocalIPCRemoteError.Stage] = [
+        .vaultKeyLoad, .vaultOpen, .vaultEncrypt, .vaultCommit, .vaultDecrypt,
+        .vaultAADValidation, .vaultRotation, .vaultRecovery, .vaultExport,
+        .credentialLeaseIssue, .credentialLeaseExpire, .credentialLeaseRevoke,
+        .migrationRead, .migrationCommit, .migrationCleanup,
+    ]
+
+    func testCredentialStagesSurviveAppPreviewAndExport() throws {
+        let fixture = try makeFixture(records: [])
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let store = try LocalOperationalDiagnostics(
+            directory: fixture.root.appendingPathComponent("diagnostics"),
+            maximumBytes: 64 * 1_024,
+            now: { Date(timeIntervalSince1970: 1_787_500_800) }
+        )
+        for stage in credentialStages {
+            for failed in [false, true] {
+                try store.recordCredential(
+                    incidentID: "app-\(stage.rawValue)-\(failed)",
+                    operation: "credential_verify",
+                    providerID: "deepseek",
+                    providerAccountID: "deepseek.primary",
+                    stage: stage,
+                    result: failed ? "failed" : "succeeded",
+                    errorCode: failed ? .credentialUnavailable : nil,
+                    retryable: failed,
+                    elapsedMilliseconds: 17
+                )
+            }
+        }
+
+        let preview = try fixture.exporter.preview(input: .init())
+        XCTAssertEqual(preview.events.count, credentialStages.count * 2)
+        XCTAssertEqual(preview.diagnosticFilesSkipped, 0)
+        for stage in credentialStages {
+            for failed in [false, true] {
+                let event = try XCTUnwrap(preview.events.first {
+                    $0.incidentID == "app-\(stage.rawValue)-\(failed)"
+                })
+                XCTAssertEqual(event.source, "app")
+                XCTAssertEqual(event.stage, stage.rawValue)
+                XCTAssertEqual(event.operation, "credential_verify")
+                XCTAssertEqual(event.providerID, "deepseek")
+                XCTAssertEqual(event.providerAccountID, "deepseek.primary")
+                XCTAssertEqual(event.elapsedMilliseconds, 17)
+                XCTAssertEqual(event.result, failed ? "failed" : "succeeded")
+                XCTAssertEqual(event.errorCode, failed ? "credential_unavailable" : nil)
+                XCTAssertEqual(event.retryable, failed)
+            }
+        }
+        try assertExportRoundTrip(preview, fixture: fixture)
+    }
+
+    func testCredentialStagesSurviveDaemonPreviewAndExport() throws {
+        var records = credentialStages.flatMap { stage in
+            [false, true].map { failed in
+                credentialRecord(stage: stage.rawValue, failed: failed)
+            }
+        }
+        var providerRecord = credentialRecord(stage: "provider_auth", failed: true)
+        providerRecord["error_code"] = "provider_auth"
+        records.append(providerRecord)
+        records.append(gatewayRecord(version: 3))
+        let fixture = try makeFixture(records: records)
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+
+        let preview = try fixture.exporter.preview(input: .init())
+        XCTAssertEqual(preview.events.count, credentialStages.count * 2 + 2)
+        XCTAssertEqual(preview.diagnosticFilesSkipped, 0)
+        for stage in credentialStages {
+            for failed in [false, true] {
+                let event = try XCTUnwrap(preview.events.first {
+                    $0.incidentID == "daemon-\(stage.rawValue)-\(failed)"
+                })
+                XCTAssertEqual(event.source, "daemon")
+                XCTAssertEqual(event.stage, stage.rawValue)
+                XCTAssertEqual(event.operation, "credential_verify")
+                XCTAssertEqual(event.credentialRuntime, "vault")
+                XCTAssertEqual(event.credentialHelperSpawnAttempts, 0)
+                XCTAssertEqual(event.providerID, "deepseek")
+                XCTAssertEqual(event.providerAccountID, "deepseek.primary")
+                XCTAssertEqual(event.elapsedMilliseconds, 17)
+                XCTAssertEqual(event.result, failed ? "failed" : "succeeded")
+                XCTAssertEqual(event.errorCode, failed ? "credential_unavailable" : nil)
+                XCTAssertEqual(event.retryable, failed)
+            }
+        }
+        XCTAssertTrue(preview.events.contains { $0.stage == "provider_auth" })
+        XCTAssertTrue(preview.events.contains { $0.gatewayEventSchemaVersion == 3 })
+        try assertExportRoundTrip(preview, fixture: fixture)
+    }
+
+    func testCredentialStageExpansionKeepsInvalidRecordsExcluded() throws {
+        let valid = credentialRecord(stage: "vault_open", failed: true)
+        var invalid: [[String: Any]] = []
+        for stage in ["", "vault_future", "vault_open private", "credential_lease_future", "migration_future"] {
+            var record = valid
+            record["stage"] = stage
+            invalid.append(record)
+        }
+        var missingFailureCode = valid
+        missingFailureCode.removeValue(forKey: "error_code")
+        invalid.append(missingFailureCode)
+        var successWithError = valid
+        successWithError["result"] = "succeeded"
+        successWithError["retryable"] = false
+        invalid.append(successWithError)
+        var retryableSuccess = credentialRecord(stage: "vault_open", failed: false)
+        retryableSuccess["retryable"] = true
+        invalid.append(retryableSuccess)
+        for (key, value) in [
+            ("result", "unknown"), ("credential_runtime", "unknown"),
+            ("error_code", "private diagnostic text"),
+        ] {
+            var record = valid
+            record[key] = value
+            invalid.append(record)
+        }
+        for (key, value) in [("schema_version", 2), ("elapsed_ms", -1)] {
+            var record = valid
+            record[key] = value
+            invalid.append(record)
+        }
+        var mixedGateway = gatewayRecord(version: 3)
+        mixedGateway["stage"] = "vault_open"
+        invalid.append(mixedGateway)
+        for key in [
+            "authorization_header", "credential_reference", "secret",
+            "workspace_path", "prompt", "provider_response_body",
+        ] {
+            var record = valid
+            record[key] = "must-not-survive-\(key)"
+            invalid.append(record)
+        }
+        var nestedSecret = valid
+        nestedSecret["extra"] = ["secret": "must-not-survive-nested"]
+        invalid.append(nestedSecret)
+        let fixture = try makeFixture(records: [valid] + invalid)
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+
+        let preview = try fixture.exporter.preview(input: .init())
+        XCTAssertEqual(preview.events.map(\.incidentID), ["daemon-vault_open-true"])
+        XCTAssertEqual(preview.diagnosticFilesSkipped, invalid.count)
+        try assertExportRoundTrip(preview, fixture: fixture)
+        let exported = try String(
+            contentsOf: fixture.root.appendingPathComponent("credential-diagnostics.json"),
+            encoding: .utf8
+        )
+        XCTAssertFalse(exported.contains("must-not-survive"))
+        XCTAssertFalse(exported.contains("private diagnostic text"))
+        XCTAssertFalse(exported.contains("vault_future"))
+    }
+
     func testPreviewAndExportContainOnlyAllowlistedSupportData() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("loom-diagnostic-bundle-\(UUID().uuidString)")
@@ -437,6 +592,38 @@ final class LocalDiagnosticBundleTests: XCTestCase {
         XCTAssertFalse(preview.socketHealthy)
         XCTAssertTrue(preview.events.isEmpty)
         XCTAssertEqual(preview.diagnosticFilesSkipped, 1)
+    }
+
+    private func credentialRecord(stage: String, failed: Bool) -> [String: Any] {
+        var record: [String: Any] = [
+            "schema_version": 1,
+            "occurred_at": "2026-08-24T11:12:13.000Z",
+            "incident_id": "daemon-\(stage)-\(failed)",
+            "operation": "credential_verify",
+            "credential_runtime": "vault",
+            "credential_helper_spawn_attempts": 0,
+            "provider_id": "deepseek",
+            "provider_account_id": "deepseek.primary",
+            "stage": stage,
+            "elapsed_ms": 17,
+            "result": failed ? "failed" : "succeeded",
+            "retryable": failed,
+        ]
+        if failed { record["error_code"] = "credential_unavailable" }
+        return record
+    }
+
+    private func assertExportRoundTrip(
+        _ preview: LocalDiagnosticBundlePreview,
+        fixture: (root: URL, exporter: LocalDiagnosticBundleExporter)
+    ) throws {
+        let destination = fixture.root.appendingPathComponent("credential-diagnostics.json")
+        try fixture.exporter.export(preview, to: destination)
+        let data = try Data(contentsOf: destination)
+        let decoded = try JSONDecoder().decode(LocalDiagnosticBundlePreview.self, from: data)
+        XCTAssertEqual(decoded, preview)
+        let attributes = try FileManager.default.attributesOfItem(atPath: destination.path)
+        XCTAssertEqual((attributes[.posixPermissions] as? NSNumber)?.intValue, 0o600)
     }
 
     private func gatewayRecord(version: Int) -> [String: Any] {
