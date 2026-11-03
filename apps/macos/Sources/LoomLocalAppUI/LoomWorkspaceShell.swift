@@ -4,6 +4,31 @@ import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// The shared visible rail brand. This view has no service or store dependency.
+public struct WorkspaceBrandHeader: View {
+    private let compact: Bool
+
+    public init(compact: Bool = false) {
+        self.compact = compact
+    }
+
+    public var body: some View {
+        HStack(spacing: 9) {
+            Image(systemName: "square.3.layers.3d")
+                .foregroundStyle(LoomGraphite.accent)
+            if !compact {
+                Text(LocalProductCopy.productName)
+                    .font(.headline)
+                Spacer()
+            }
+        }
+        .padding(.horizontal, compact ? 20 : 14)
+        .frame(height: 52)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(LocalProductCopy.productName)
+    }
+}
+
 struct ConversationComposerActionPresentation: Equatable {
     let systemImage: String
     let accessibilityLabel: String
@@ -776,24 +801,12 @@ public struct LoomWorkspaceShell: View {
             governance.dismissIfPresented()
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Loom workspace")
+        .accessibilityLabel(LocalProductCopy.workspaceAccessibilityLabel)
     }
 
     private func navigationRail(compact: Bool) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 9) {
-                Image(systemName: "square.3.layers.3d")
-                    .foregroundStyle(LoomGraphite.accent)
-                if !compact {
-                    Text("Loom")
-                        .font(.headline)
-                    Spacer()
-                }
-            }
-            .padding(.horizontal, compact ? 20 : 14)
-            .frame(height: 52)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Loom")
+            WorkspaceBrandHeader(compact: compact)
 
             Divider()
                 .background(LoomGraphite.separator)

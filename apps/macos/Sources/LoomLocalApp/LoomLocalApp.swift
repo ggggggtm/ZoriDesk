@@ -48,7 +48,7 @@ private struct LoomApplication: App {
     }
 
     var body: some Scene {
-        WindowGroup("Loom") {
+        WindowGroup(LocalProductCopy.productName) {
             ContentView(
                 store: store,
                 prepareLocalService: prepareLocalService
