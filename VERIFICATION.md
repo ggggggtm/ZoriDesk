@@ -1,6 +1,6 @@
 # 无账号的 Sandbox 与启动验证入口
 
-状态：Q05/Q09/Q10 的有界 Sandbox 验证、Q11 启动回归与 Q12 诊断脱敏/导出切片，不代表完整应用通过验收。运行结果见 [STATUS.md](STATUS.md)，任务依赖见 [TASKS.md](TASKS.md)。
+状态：Q05/Q09/Q10 的有界 Sandbox 验证、Q11 启动回归、Q12诊断验收及Q06首个品牌切片，不代表完整应用通过验收。运行结果见 [STATUS.md](STATUS.md)，任务依赖见 [TASKS.md](TASKS.md)。
 
 ## 怎么运行
 
@@ -202,3 +202,15 @@ Q12整项完成依据见[TASKS验收矩阵](TASKS.md#q12让诊断可理解可操
 本轮在隔离Git副本中使用真实`NewDeepSeekConversationClient.Respond`，注入假HTTPDoer：读取虚构Authorization，只在内存返回401及含同一虚构值的error.code。实际Provider解析结果及`NewLocalProductConversationDispatchErrorWithDetails`均保留该值，固定Error()/UserMessage不含该值；没有真实网络/密钥/Vault，也未执行GUI或日志出口。所确认的是条件性元数据边界缺口，不是线上泄露。
 
 下一回归应覆盖这条回显数据流与诊断出口，同时保留合法字符串/数值码、HTTP分类、retry和固定安全提示；至少阻止已知请求凭据进入诊断码，再明确未知码回退策略，不能只按某个前缀或空格判断。Agent Input的非网关segment则有现存拒绝契约，需先决定支持范围，不混为这条隐私修复的一部分。本轮只核验并记录，未实施新Provider行为。
+
+## Q06：展示名称与兼容标识分开
+
+2026-11-03验收更新：b722a1c经再次完整及新的独立只读review无阻断，按维护者明确授权保留历史合main；[分支CI41630842954](https://github.com/ggggggtm/ZoriDesk/actions/runs/41630842954)准确SHA及原始日志重新核对，普通/race启动625条、Sandbox107条和31项XCTest均无skip，三项品牌测试逐项passed。本次合并CI单独确认；以下推送前描述为历史证据，不能误判仍需重写头部或替代合并CI。
+
+首切片`feat/workspace-branding`只统一WindowGroup标题、工作区/Mission侧栏头部与无障碍名称。`LocalProductCopy.productName`是展示文案，不是协议、bundle ID或存储namespace；入口与两处头部引用它，纯SwiftUI的`WorkspaceBrandHeader`保留原52点高度、图标/字体/内边距，宽版显示名称、紧凑版仅显示图标但保留无障碍名称。这里不需要创建Store、启动daemon或访问Vault。
+
+先增加三项XCTest，再对旧生产源码执行接线检查，因窗口Loom而非ZoriDesk真实失败；修改后同一检查通过。该RED是源码契约，不是GUI测试执行。实际Swift应用编译通过，独立探针链接真实Core/UI模块，在192/64点宽、明/暗四种组合离屏渲染，PNG及布局检查通过并逐张查看名称/图标无截断；不是复制一个假界面，也不是安装后整窗或菜单验收。
+
+`verify-startup-ui.sh`保留原28项并新增`LoomGraphiteViewTests`三项：文案、生产接线/兼容标识、四种NSHostingView布局与位图，共31项逐项核验passed、拒绝skip/空选。本机CLT实际无法导入XCTest，不能把编译/探针算成XCTest；上述对应提交CI实际执行全部检查。本轮review只引用未变化的本地证据，不伪称重新运行。Q06仍有其他可见文案待分批核对，不全局替换Loom、不触及Q07/Q08安装与数据兼容。
+
+剩余核验见[TASKS的Q06清单](TASKS.md#q06统一用户可见品牌)：活跃聊天展示/读屏/复制文本优先，其后连接与错误建议、Vault展示和包显示元数据；本次只有源码审计，没有运行安装后菜单或改这些行为。下一项改品牌展示时必须保留`"loom"`角色协议值、用户内容、proposal不可信提示和原重试/权限规则；`.loomvault`格式、运行时别名含义、存储与来源不是任意替换对象。

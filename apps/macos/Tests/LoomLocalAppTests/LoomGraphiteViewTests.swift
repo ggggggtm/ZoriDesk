@@ -9,6 +9,86 @@ private var retainedMissionWorkbenchWindows: [NSWindow] = []
 
 @MainActor
 final class LoomGraphiteViewTests: XCTestCase {
+    func testWorkspaceBrandCopyIdentifiesZoriDesk() async {
+        XCTAssertEqual(LocalProductCopy.productName, "ZoriDesk")
+        XCTAssertEqual(
+            LocalProductCopy.workspaceAccessibilityLabel,
+            "ZoriDesk workspace"
+        )
+        XCTAssertEqual(
+            LocalProductCopy.missionWorkbenchAccessibilityLabel,
+            "ZoriDesk Mission orchestration workbench"
+        )
+        XCTAssertEqual(
+            LocalProductCopy.governanceAccessibilityLabel,
+            "ZoriDesk governance panel"
+        )
+    }
+
+    func testWorkspaceBrandWiringPreservesCompatibilityIdentifiers() async throws {
+        let packageRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        func source(_ relativePath: String) throws -> String {
+            try String(
+                contentsOf: packageRoot.appendingPathComponent(relativePath),
+                encoding: .utf8
+            )
+        }
+        let app = try source("Sources/LoomLocalApp/LoomLocalApp.swift")
+        let shell = try source("Sources/LoomLocalAppUI/LoomWorkspaceShell.swift")
+        let mission = try source("Sources/LoomLocalAppUI/MissionWorkbench.swift")
+        XCTAssertTrue(app.contains("WindowGroup(LocalProductCopy.productName)"))
+        XCTAssertTrue(shell.contains("WorkspaceBrandHeader(compact: compact)"))
+        XCTAssertTrue(shell.contains(
+            ".accessibilityLabel(LocalProductCopy.workspaceAccessibilityLabel)"
+        ))
+        XCTAssertTrue(mission.contains("WorkspaceBrandHeader()"))
+        XCTAssertTrue(mission.contains("LocalProductCopy.missionWorkbenchAccessibilityLabel"))
+        XCTAssertTrue(mission.contains("LocalProductCopy.governanceAccessibilityLabel"))
+
+        // Display copy must not rename runtime, IPC or installation contracts.
+        XCTAssertTrue(app.contains("com.earendilworks.loom.local"))
+        XCTAssertTrue(shell.contains(".loomOpenFolderRequested"))
+        XCTAssertTrue(shell.contains("case \"loom-native\""))
+        let host = try source("Sources/LoomLocalApp/LocalServiceProcessHost.swift")
+        XCTAssertTrue(host.contains("Library/Application Support/Loom/run/loomd.sock"))
+        let package = try source("Package.swift")
+        XCTAssertTrue(package.contains("name: \"LoomLocalApp\""))
+    }
+
+    func testWorkspaceBrandHeaderRendersWideAndCompact() async throws {
+        for compact in [false, true] {
+            for dark in [false, true] {
+                let width: CGFloat = compact ? 64 : 192
+                let view = NSHostingView(
+                    rootView: WorkspaceBrandHeader(compact: compact)
+                        .frame(width: width, height: 52)
+                        .background(Color(nsColor: .windowBackgroundColor))
+                        .environment(\.colorScheme, dark ? .dark : .light)
+                )
+                view.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+                view.frame = NSRect(x: 0, y: 0, width: width, height: 52)
+                view.layoutSubtreeIfNeeded()
+                XCTAssertTrue(view.fittingSize.width.isFinite)
+                XCTAssertTrue(view.fittingSize.height.isFinite)
+                XCTAssertLessThanOrEqual(view.fittingSize.width, width)
+                XCTAssertEqual(view.fittingSize.height, 52, accuracy: 0.5)
+                let bitmap = try XCTUnwrap(
+                    view.bitmapImageRepForCachingDisplay(in: view.bounds)
+                )
+                view.cacheDisplay(in: view.bounds, to: bitmap)
+                XCTAssertGreaterThan(bitmap.pixelsWide, 0)
+                XCTAssertGreaterThan(bitmap.pixelsHigh, 0)
+                let png = try XCTUnwrap(
+                    bitmap.representation(using: .png, properties: [:])
+                )
+                XCTAssertFalse(png.isEmpty)
+            }
+        }
+    }
+
     func testActiveAndBlockedMissionsRemainVisibleWhenTeamIsNotExecutable() {
         XCTAssertTrue(missionHistoryIncludesMission(
             lane: .orchestrating,

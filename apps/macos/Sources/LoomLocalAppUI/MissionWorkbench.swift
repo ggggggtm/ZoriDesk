@@ -3280,21 +3280,13 @@ public struct MissionWorkbench: View {
     .accessibilityElement(children: .contain)
     .accessibilityLabel(
       showRail
-        ? "Loom Mission orchestration workbench"
-        : "Loom governance panel")
+        ? LocalProductCopy.missionWorkbenchAccessibilityLabel
+        : LocalProductCopy.governanceAccessibilityLabel)
   }
 
   private var workbenchRail: some View {
     VStack(alignment: .leading, spacing: 0) {
-      HStack(spacing: 9) {
-        Image(systemName: "square.3.layers.3d")
-          .foregroundStyle(LoomGraphite.accent)
-        Text("Loom")
-          .font(.headline)
-        Spacer()
-      }
-      .padding(.horizontal, 14)
-      .frame(height: 52)
+      WorkspaceBrandHeader()
 
       railButton("New Mission", systemImage: "plus.square") {
         prepareNewMission()

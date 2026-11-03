@@ -1,6 +1,6 @@
 # ZoriDesk 维护任务队列
 
-更新日期：2026-11-02。此处列的是可验收的工作，不是按日期凑提交的日历。
+更新日期：2026-11-03。此处列的是可验收的工作，不是按日期凑提交的日历。
 
 ## 执行方式
 
@@ -24,7 +24,7 @@
 | Q03 | 贡献指南与反馈模板 | done | 2026-10-13 按维护者授权复核并合入 main；不改变 Issues 设置 |
 | Q04 | 架构、用户路径与源码导航 | in_progress | VERIFICATION.md 已补 Q05 的验证链路；完整用户路径仍未覆盖 |
 | Q05 | 无真实账号的测试基线与 CI | done | 2026-10-28 按授权复核 0b9e1ff 并合入 main；本地与分支 CI 普通/race 各 55 个事件通过，无跳过；限定 sandbox/testreport 基线 |
-| Q06 | 用户可见品牌统一 | backlog | Q05 |
+| Q06 | 用户可见品牌统一 | in_progress | 窗口/侧栏b722a1c经授权复核合入main，分支CI41630842954普通/race及31项macOS无skip，合并CI另验；下方剩余清单尚未完成 |
 | Q07 | 安装与服务标识迁移 | backlog | Q05、Q06；与 Q08 联合设计 |
 | Q08 | 数据路径、凭证与兼容策略 | backlog | Q07/Q08 联合方案先评审 |
 | Q09 | 执行输出限制与回归测试 | done | 2026-10-28 按明确授权复核 b40a0fe 并合入 main；本地与分支 CI 普通/race 各 91 条记录通过无跳过，仅验收 Loopback 有界输出 |
@@ -96,6 +96,17 @@ Q01、Q02 为 2026-10-13 初始化文档交付；只代表维护文档，不代�
 - CI 权限或运行环境不足时明确记录缺口，不擅自开启 Actions、设置密钥或安装新工具；继续同一任务内可验证的工作，不绕过验收直接进入 Q09。
 
 ### Q06：统一用户可见品牌
+
+最新验收（2026-11-03）：窗口/两处侧栏/相关无障碍标签切片b722a1c经再次完整及新的独立只读review无阻断，按明确授权保留历史合main；准确分支CI41630842954普通/race及31项XCTest无skip，合并CI单独确认。原源码契约RED→GREEN、应用编译及四种离屏图证据保留，本轮不重复本地同一基线。首切片不再待审，不重复这些名称；Q06整体仍in_progress，不重开Q12。本次只盘点其余范围，没有顺带实现。
+
+| 剩余真实展示范围（源码核验，非全部界面实测） | 位置与边界 |
+| --- | --- |
+| 聊天身份、输入、回复中、读屏与复制文本 | `LoomWorkspaceShell.swift`的`chatTimeline`、`composer`、`conversationTranscriptText`仍用Loom/Loom proposal；存在展示/复制调用方。优先下一小切片复用productName，覆盖user/助手/proposal，但保留原角色值、内容及proposal不可信语义 |
+| 连接状态与故障建议 | `LocalProductExperience.swift`连接文案、`MissionWorkbench.swift`连接标题/启动横幅和`missionRuntimeRecoveryReason`、`LocalProductStore.swift`的`chatFailure`与凭证操作提示。仅改显示名称，不重做Q12分类、授权、超时或重试 |
+| Vault页面与导出面板 | `MissionWorkbench.swift`的Vault标题、导入按钮/说明/帮助及`chooseDestinationAndExport`的建议文件名前缀仍Loom。显示前缀与`.loomvault`格式/类型、真实Vault存储namespace分开，不改后者 |
+| 应用包显示名称 | `Resources/Info.plist`的CFBundleDisplayName/CFBundleName仍Loom，构建脚本复制入包；后续需协调构建测试并隔离验证展示效果，本轮未运行安装后菜单。不得顺带改bundle ID、可执行文件、安装位置或服务标识 |
+
+不要机械替换协议角色`"loom"`、Harness ID `loom-native`、模块/服务/通知/环境变量、socket/数据库/Vault路径、来源版权或历史证据；`Loom Native`运行时别名需先确认指代。`InteractionContinuity.primaryFlow`的旧文案在本次限定搜索未发现生产引用，不列为已确认活跃界面遗漏。下一次先做上述聊天展示边界，仍新类型/主题分支、测试与实际CI后待用户审查，不自动合main；Q07/Q08兼容迁移不提前。
 
 - 盘点窗口、菜单、设置和错误提示的 Loom 名称，分辨产品文案与必须保留的协议/版权标识。
 - 小批量修改并核对 UI；暂不全局替换模块名、数据库路径和凭证标识。

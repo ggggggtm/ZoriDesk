@@ -19,6 +19,14 @@ public enum LocalProductHomeGroup: String, CaseIterable, Sendable {
 }
 
 public enum LocalProductCopy {
+    // Presentation only: runtime, storage and installation identifiers stay
+    // separate from the visible product name.
+    public static let productName = "ZoriDesk"
+    public static let workspaceAccessibilityLabel = "\(productName) workspace"
+    public static let missionWorkbenchAccessibilityLabel =
+        "\(productName) Mission orchestration workbench"
+    public static let governanceAccessibilityLabel =
+        "\(productName) governance panel"
     public static let homeTitle = "Your local agent workspace"
     public static let homeSubtitle =
         "Follow delegated work, team activity, and items that need you."
