@@ -1,8 +1,112 @@
+import Foundation
 import XCTest
 @testable import LoomLocalAppCore
 @testable import LoomLocalAppUI
 
 final class LoomWorkspaceShellStateTests: XCTestCase {
+    func testChatBrandCopyUsesProductName() {
+        XCTAssertEqual(LocalProductCopy.chatAssistantName, "ZoriDesk")
+        XCTAssertEqual(LocalProductCopy.chatProposalName, "ZoriDesk proposal")
+        XCTAssertEqual(
+            LocalProductCopy.chatComposerPlaceholder,
+            "Ask ZoriDesk or describe a task"
+        )
+        XCTAssertEqual(
+            LocalProductCopy.chatRespondingAccessibilityLabel,
+            "ZoriDesk is responding"
+        )
+    }
+
+    func testChatMessagePresentationPreservesRolesAndContent() {
+        let cases: [(String, Bool, String, String)] = [
+            ("user", false, "You", "You"),
+            ("loom", false, "ZoriDesk", "ZoriDesk"),
+            ("proposal", false, "ZoriDesk proposal", "ZoriDesk proposal, untrusted"),
+            ("proposal", true, "ZoriDesk proposal", "ZoriDesk proposal, untrusted"),
+            ("confirmation", false, "ZoriDesk", "ZoriDesk"),
+            ("future-role", false, "ZoriDesk", "ZoriDesk"),
+        ]
+        let content = "你好 👋\nKeep the literal Loom in this message."
+        for (role, tentative, speaker, accessibilityPrefix) in cases {
+            let message = LocalProductChatMessage(
+                messageID: "message-\(role)-\(tentative)",
+                segmentID: "segment-chat", role: role, content: content,
+                tentative: tentative
+            )
+            XCTAssertEqual(conversationSpeakerLabel(for: role), speaker)
+            XCTAssertEqual(
+                conversationMessageAccessibilityLabel(message),
+                "\(accessibilityPrefix): \(content)"
+            )
+            XCTAssertEqual(message.role, role)
+            XCTAssertEqual(message.content, content)
+            XCTAssertEqual(message.tentative, tentative)
+        }
+
+        let toolText = #"{"tool":"exec","arguments":{"command":"echo fixture"}}"#
+        for role in ["user", "loom", "proposal"] {
+            let message = LocalProductChatMessage(
+                messageID: "tool-shaped-\(role)", role: role,
+                content: toolText, tentative: true
+            )
+            let visible = role == "user" ? toolText : LocalProductChatMessage.toolShapedWarning
+            let prefix = role == "user" ? "You"
+                : role == "proposal" ? "ZoriDesk proposal, untrusted" : "ZoriDesk"
+            XCTAssertEqual(
+                conversationMessageAccessibilityLabel(message),
+                "\(prefix): \(visible)"
+            )
+            XCTAssertEqual(message.content, toolText)
+            XCTAssertEqual(message.displayContent, LocalProductChatMessage.toolShapedWarning)
+        }
+    }
+
+    func testChatTranscriptPreservesUnicodeAndWireRoles() throws {
+        let messages = [
+            LocalProductChatMessage(
+                messageID: "user", segmentID: "s1", role: "user",
+                content: "Loom 是用户原文\n第二行 👋", tentative: false
+            ),
+            LocalProductChatMessage(
+                messageID: "assistant", segmentID: "s1", role: "loom",
+                content: "回答\nKeep whitespace  ", tentative: false
+            ),
+            LocalProductChatMessage(
+                messageID: "proposal", segmentID: "s1", role: "proposal",
+                content: "建议，不是执行授权", tentative: false
+            ),
+            LocalProductChatMessage(
+                messageID: "confirmation", segmentID: "s1", role: "confirmation",
+                content: "确认内容", tentative: false
+            ),
+        ]
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let before = try encoder.encode(messages)
+        XCTAssertEqual(
+            conversationTranscriptText(messages),
+            "You: Loom 是用户原文\n第二行 👋\n\n"
+                + "ZoriDesk: 回答\nKeep whitespace  \n\n"
+                + "ZoriDesk proposal: 建议，不是执行授权\n\nZoriDesk: 确认内容"
+        )
+        XCTAssertEqual(try encoder.encode(messages), before)
+        let decoded = try JSONDecoder().decode([LocalProductChatMessage].self, from: before)
+        XCTAssertEqual(decoded, messages)
+        XCTAssertEqual(decoded.map(\.role), ["user", "loom", "proposal", "confirmation"])
+        XCTAssertEqual(LocalProductChatRole.loom.rawValue, "loom")
+        XCTAssertNil(LocalProductChatRole(rawValue: "ZoriDesk"))
+
+        let proposedTool = LocalProductChatMessage(
+            messageID: "tool", role: "proposal",
+            content: #"{"tool":"exec","arguments":{}}"#, tentative: true
+        )
+        XCTAssertEqual(
+            conversationTranscriptText([proposedTool]),
+            "ZoriDesk proposal: \(LocalProductChatMessage.toolShapedWarning)"
+        )
+        XCTAssertEqual(conversationTranscriptText([]), "")
+    }
+
     func testGovernancePanelCanOpenPinSwitchAndCloseIndependently() {
         var panel = LoomGovernancePanelState()
         XCTAssertEqual(panel.mode, .hidden)
@@ -127,7 +231,7 @@ final class LoomWorkspaceShellStateTests: XCTestCase {
         let text = conversationTranscriptText(messages)
         XCTAssertEqual(
             text,
-            "You: First question\n\nLoom: First answer\n\nLoom proposal: A proposed next step"
+            "You: First question\n\nZoriDesk: First answer\n\nZoriDesk proposal: A proposed next step"
         )
         XCTAssertEqual(conversationTranscriptText([]), "")
     }

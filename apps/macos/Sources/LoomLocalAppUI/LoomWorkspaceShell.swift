@@ -29,6 +29,26 @@ public struct WorkspaceBrandHeader: View {
     }
 }
 
+// Presentation only: raw roles remain part of the existing wire contract.
+func conversationSpeakerLabel(for role: String) -> String {
+    switch role {
+    case "user": return "You"
+    case "proposal": return LocalProductCopy.chatProposalName
+    default: return LocalProductCopy.chatAssistantName
+    }
+}
+
+func conversationMessageAccessibilityLabel(_ message: LocalProductChatMessage) -> String {
+    let speaker = conversationSpeakerLabel(for: message.role)
+    if message.role == "user" {
+        return "\(speaker): \(message.content)"
+    }
+    if message.role == "proposal" {
+        return "\(speaker), untrusted: \(message.displayContent)"
+    }
+    return "\(speaker): \(message.displayContent)"
+}
+
 struct ConversationComposerActionPresentation: Equatable {
     let systemImage: String
     let accessibilityLabel: String
@@ -1442,7 +1462,7 @@ public struct LoomWorkspaceShell: View {
                         .frame(width: 22)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 5) {
-                        Text(message.role == "user" ? "You" : isAgentProposal ? "Loom proposal" : "Loom")
+                        Text(conversationSpeakerLabel(for: message.role))
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(
                                 message.role == "user"
@@ -1605,13 +1625,7 @@ public struct LoomWorkspaceShell: View {
                     Spacer(minLength: 0)
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel(
-                    message.role == "user"
-                        ? "You: \(message.content)"
-                        : isAgentProposal
-                            ? "Loom proposal, untrusted: \(message.displayContent)"
-                            : "Loom: \(message.displayContent)"
-                )
+                .accessibilityLabel(conversationMessageAccessibilityLabel(message))
             }
             if store.isSendingChatMessage {
                 HStack(alignment: .top, spacing: 10) {
@@ -1619,12 +1633,12 @@ public struct LoomWorkspaceShell: View {
                         .foregroundStyle(.secondary)
                         .frame(width: 22)
                     VStack(alignment: .leading, spacing: 7) {
-                        Text("Loom")
+                        Text(LocalProductCopy.chatAssistantName)
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
                         ProgressView()
                             .controlSize(.small)
-                            .accessibilityLabel("Loom is responding")
+                            .accessibilityLabel(LocalProductCopy.chatRespondingAccessibilityLabel)
                     }
                     Spacer(minLength: 0)
                 }
@@ -1710,7 +1724,7 @@ public struct LoomWorkspaceShell: View {
 
             HStack(alignment: .bottom, spacing: 10) {
                 TextField(
-                    "Ask Loom or describe a task",
+                    LocalProductCopy.chatComposerPlaceholder,
                     text: Binding(
                         get: { store.workspace.selectedContinuity.composerDraft },
                         set: store.updateComposerDraft
@@ -3920,12 +3934,7 @@ func runtimeAvailabilityAccessibilityLabel(
 /// per message, blank-line separated, so the whole thread can be copied at once.
 func conversationTranscriptText(_ messages: [LocalProductChatMessage]) -> String {
     let parts = messages.map { message -> String in
-        let speaker: String
-        switch message.role {
-        case "user": speaker = "You"
-        case "proposal": speaker = "Loom proposal"
-        default: speaker = "Loom"
-        }
+        let speaker = conversationSpeakerLabel(for: message.role)
         return "\(speaker): \(message.displayContent)"
     }
     return parts.joined(separator: "\n\n")
