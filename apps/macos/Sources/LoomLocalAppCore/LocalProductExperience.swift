@@ -27,6 +27,10 @@ public enum LocalProductCopy {
         "\(productName) Mission orchestration workbench"
     public static let governanceAccessibilityLabel =
         "\(productName) governance panel"
+    public static let chatAssistantName = productName
+    public static let chatProposalName = "\(productName) proposal"
+    public static let chatComposerPlaceholder = "Ask \(productName) or describe a task"
+    public static let chatRespondingAccessibilityLabel = "\(productName) is responding"
     public static let homeTitle = "Your local agent workspace"
     public static let homeSubtitle =
         "Follow delegated work, team activity, and items that need you."

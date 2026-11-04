@@ -1,6 +1,6 @@
 # ZoriDesk 当前状态
 
-更新日期：2026-11-03。本文只记录 ZoriDesk 的事实，不把上游验收记录当作本项目复验结果。
+更新日期：2026-11-04。本文只记录 ZoriDesk 的事实，不把上游验收记录当作本项目复验结果。
 
 ## 项目身份与阅读顺序
 
@@ -17,8 +17,8 @@
 | 公开仓库初始化 | 已完成；2026-11-02通过GitHub原生操作脱离Fork网络，地址/ID、12分支SHA及320个可达提交未变，必要来源与许可保留 |
 | 项目介绍 | 已发布 README，提交 510fdc956d74e533eb6b43551e1fffc3d10d24ef |
 | 运行时代码 | Provider凭证回显修复dcc3aa6经再次完整及独立复核，按维护者授权保留历史合入main；Q12按下方既定有界验收关闭，不代表全应用安全审计完成 |
-| 构建、测试、端到端验证 | 品牌分支b722a1c的CI41630842954实际通过：普通/race启动625条、Sandbox107条、macOS31项无skip；本次合并CI另验，不借用分支结果。完整GUI、模型E2E及全仓未验证 |
-| 应用与服务内部名称 | Q06首个窗口/侧栏品牌切片b722a1c经再次完整及独立review，按授权保留历史合入main；Q06整体仍in_progress，聊天、连接/错误、Vault及包显示名称有剩余，兼容标识保留 |
+| 构建、测试、端到端验证 | main cbead8a的CI41648983696普通/race及31项macOS已通过；本次聊天分支应用构建与真实转录/读屏标签函数探针通过，38项macOS及原Go普通/race推送后核验。完整GUI、模型E2E及全仓未验证 |
+| 应用与服务内部名称 | 窗口/侧栏已验收；聊天展示在`fix/chat-presentation-branding`待审、不合main。Q06整体仍in_progress，连接/错误、Vault及包显示名称未统一，兼容标识保留 |
 | 本地开发与提交环境 | 已建立独立 checkout；SSH 认证到正确所有者，仓库级个人提交身份已配置；Q00 记录已真实推送并核对远端 SHA |
 | Docker / Kubernetes 后端 | 后续规划，不能写成已交付能力 |
 | 发布版本 | 尚未发布 ZoriDesk 版本 |
@@ -34,7 +34,7 @@
 ## 下一步
 
 1. Q00、Q03 经复核并按维护者明确授权合入 main，状态 done；不重复初始化或创建模板。此授权仅针对这两个任务，不改变以后定时维护的分支审查规则。
-2. Q12保持done；先确认本次品牌合并CI，再按Q06剩余清单推进聊天展示小切片，不重复窗口/侧栏或Q09/Q10/Q11/Q12。Q04随实现同步；服务/数据兼容属于Q07/Q08，不全局替换标识。后续新分支仍待用户审查、不自动合main，本次未顺带实现剩余文案。
+2. Q12保持done；先完成当前聊天展示切片的CI与审查，不从main重复开发聊天或已验收的窗口/侧栏。其余连接/错误、Vault和包显示名按Q06清单后续分批核对；Q04随实现同步，Q07/Q08兼容标识不机械替换。后续新分支仍待用户审查、不自动合main。
 3. Q04 随代码和测试同步补充真实路径与关键函数，不阻塞 Q05/Q09；品牌与兼容性任务后置，原有验收、安全边界和分支审查规则保持不变。
 4. 执行前检查实际分支、未提交改动和待审查工作；有未完成任务先收尾，不机械开始新任务。
 
@@ -339,6 +339,14 @@ git diff --exit-code -- go.mod go.sum
 - 本地Swift6.2.4应用编译及同一源码检查GREEN；链接实际Core/UI模块的隔离探针在宽192/紧凑64、明/暗四种组合生成PNG，均有界且逐张目视确认宽版名称完整、紧凑图标正常。未实例化LocalProductStore、启动服务或读取用户数据/凭证；不等同安装后整窗/菜单或真实桌面E2E。CLT实际缺XCTest，未称本地XCTest通过。
 - `verify-startup-ui.sh`保留原28项并追加品牌文案/接线兼容/真实NSHostingView渲染三项，共31项，仍逐项要求passed并拒绝skip/空选。生产/测试/脚本已独立只读复核无阻断；远端CI推送后核验，既有Go普通/race仍需实际通过，不机械重跑未变化的本地Go基线。
 - Q06整体仍in_progress，首切片验收不等于全品牌完成。独立有界源码审计确认聊天输入/说话人/回复中/读屏/复制前缀、连接和故障建议、Vault页面与导出建议名、Info.plist显示名称仍含Loom，清单见TASKS。包显示元数据由构建脚本复制，但本轮未运行安装后菜单，不能称菜单实测。下一项优先聊天展示，不改角色协议值或文本内容；服务/数据标识、Harness含义及历史来源不机械替换。
+
+## Q06 聊天展示品牌切片（2026-11-04）
+
+- 基准main`cbead8a`，分支`fix/chat-presentation-branding`。先补四项回归并同步两处旧品牌期望，再最小统一输入占位、助手/proposal说话人、回复中、读屏与复制前缀；原31项门禁完整保留，加入四新、两处受影响旧测试与原Stop控制，共38项逐项要求passed、拒skip/空选。
+- `LocalProductCopy`复用productName；`conversationSpeakerLabel`和`conversationMessageAccessibilityLabel`只负责展示。实际timeline、输入框、回复中和`conversationTranscriptText`引用它们，保留user/loom/proposal/confirmation协议值、原消息内容/JSON、多行Unicode/空白、空转录与段落分隔。proposal按角色保留untrusted提示，不按tentative猜身份；用户读屏仍用原文，其他角色用原displayContent，工具形态安全警告不改。
+- 新真实探针链接修改前的Core/UI，调用原`conversationTranscriptText`期望ZoriDesk前缀时实际RED退出1；最小修改后同探针GREEN，另一个实际展示/读屏标签函数探针通过，涵盖confirmation/未知角色原fallback、proposal true/false和工具形态内容。Swift6.2.4修改后应用构建14.47秒通过；发送/复制/Profile切换处理函数与main逐字对照未变，输入绑定、取消及按钮状态也有源接线/原行为回归。
+- 本机CLT实际无法导入XCTest，不把编译/探针当作XCTest；正式38项由对应提交macOS CI执行，Go普通/race门禁保留。未启动产品、读取用户数据/Vault或调用模型；未修改窗口/侧栏、协议模型、存储、服务、Harness、警告正文或其他页面，不声称真实GUI/全仓/E2E验收。
+- 当前为待审切片，Q06整体仍in_progress、不合main；推送后需核验准确SHA的CI。已验收能力不重复，余下连接与错误提示、Vault和包显示元数据另定小切片，不顺带Q07/Q08迁移或重开Q12。
 
 ## 状态维护约定
 

@@ -214,3 +214,11 @@ Q12整项完成依据见[TASKS验收矩阵](TASKS.md#q12让诊断可理解可操
 `verify-startup-ui.sh`保留原28项并新增`LoomGraphiteViewTests`三项：文案、生产接线/兼容标识、四种NSHostingView布局与位图，共31项逐项核验passed、拒绝skip/空选。本机CLT实际无法导入XCTest，不能把编译/探针算成XCTest；上述对应提交CI实际执行全部检查。本轮review只引用未变化的本地证据，不伪称重新运行。Q06仍有其他可见文案待分批核对，不全局替换Loom、不触及Q07/Q08安装与数据兼容。
 
 剩余核验见[TASKS的Q06清单](TASKS.md#q06统一用户可见品牌)：活跃聊天展示/读屏/复制文本优先，其后连接与错误建议、Vault展示和包显示元数据；本次只有源码审计，没有运行安装后菜单或改这些行为。下一项改品牌展示时必须保留`"loom"`角色协议值、用户内容、proposal不可信提示和原重试/权限规则；`.loomvault`格式、运行时别名含义、存储与来源不是任意替换对象。
+
+### 聊天展示不是角色协议重命名（2026-11-04）
+
+分支`fix/chat-presentation-branding`复用`LocalProductCopy.productName`定义聊天名称、占位和回复中标签；真实timeline、TextField、ProgressView读屏及复制转录通过展示常量/`conversationSpeakerLabel`/`conversationMessageAccessibilityLabel`取值。原`"user"`仍展示You，`"proposal"`显示ZoriDesk proposal且读屏保留untrusted；`"loom"`、confirmation及原未知角色fallback展示助手名称，但不改任何原始role值。proposal身份不依赖tentative；用户读屏原文与其他角色displayContent、工具形态警告规则保持。
+
+新增四项回归，同步旧转录预期与旧builder安全接线断言：仍验证proposal不可信、角色判断及其余原断言，不删除测试。原Stop按钮行为纳入门禁，原31项完整保留后总计38项，逐项要求passed、拒绝skip和空选。JSON前后编码/解码、中文/换行/空白/原文Loom、空转录、角色fallback、proposal tentative true/false及工具形态消息均有测试。发送/复制/Profile切换函数逐字对照未变，不改正文、段落分隔或剪贴板动作。
+
+本地实际编译旧Core/UI调用`conversationTranscriptText`先RED（旧前缀不符）；最小修复后同探针GREEN，实际展示/读屏标签函数与Stop动作探针通过，应用编译通过。探针不实例化Store、不读取用户数据/凭证，不是完整聊天GUI、实际VoiceOver或E2E；本机CLT确实缺XCTest，正式38项及原Go普通/race由推送后的对应CI实际执行。Q06整体仍进行中，当前分支待审、不合main；窗口/侧栏不再修改，连接/错误、Vault、包元数据未在本切片改动。

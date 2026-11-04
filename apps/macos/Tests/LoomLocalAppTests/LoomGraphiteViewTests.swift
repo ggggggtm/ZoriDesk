@@ -9,6 +9,39 @@ private var retainedMissionWorkbenchWindows: [NSWindow] = []
 
 @MainActor
 final class LoomGraphiteViewTests: XCTestCase {
+    func testChatBrandWiringPreservesComposerAndCopyInteraction() async throws {
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/LoomLocalAppUI/LoomWorkspaceShell.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+        let timelineStart = try XCTUnwrap(source.range(of: "private var chatTimeline: some View"))
+        let composerStart = try XCTUnwrap(source.range(of: "private var composer: some View"))
+        let composerEnd = try XCTUnwrap(source.range(of: "private func requestConversationProfileSelection"))
+        let timeline = String(source[timelineStart.lowerBound..<composerStart.lowerBound])
+        let composer = String(source[composerStart.lowerBound..<composerEnd.lowerBound])
+        XCTAssertTrue(timeline.contains("Text(conversationSpeakerLabel(for: message.role))"))
+        XCTAssertTrue(timeline.contains(
+            ".accessibilityLabel(conversationMessageAccessibilityLabel(message))"
+        ))
+        XCTAssertTrue(timeline.contains("Text(LocalProductCopy.chatAssistantName)"))
+        XCTAssertTrue(timeline.contains(
+            ".accessibilityLabel(LocalProductCopy.chatRespondingAccessibilityLabel)"
+        ))
+        XCTAssertTrue(timeline.contains(#"message.role == "proposal""#))
+        XCTAssertTrue(composer.contains("LocalProductCopy.chatComposerPlaceholder"))
+        XCTAssertTrue(composer.contains("set: store.updateComposerDraft"))
+        XCTAssertTrue(composer.contains(".onSubmit {\n                    sendConversationDraft()"))
+        XCTAssertTrue(composer.contains("if store.isSendingChatMessage"))
+        XCTAssertTrue(composer.contains("Task { await store.cancelActiveChatResponse() }"))
+        XCTAssertTrue(composer.contains(".accessibilityLabel(action.accessibilityLabel)"))
+        XCTAssertTrue(composer.contains(".disabled(!actionEnabled)"))
+        XCTAssertTrue(source.contains("let text = conversationTranscriptText(thread.messages)"))
+        XCTAssertTrue(source.contains("pasteboard.setString(text, forType: .string)"))
+        XCTAssertTrue(source.contains("pendingConversationRouteTransition = transition"))
+    }
+
     func testWorkspaceBrandCopyIdentifiesZoriDesk() async {
         XCTAssertEqual(LocalProductCopy.productName, "ZoriDesk")
         XCTAssertEqual(
@@ -531,7 +564,14 @@ final class LoomGraphiteViewTests: XCTestCase {
         XCTAssertTrue(source.contains("await store.confirmBuilderCommitting("))
         XCTAssertTrue(source.contains("store.cancelBuilder()"))
         XCTAssertTrue(source.contains("store.builderRecoveryMessage"))
-        XCTAssertTrue(source.contains("Loom proposal, untrusted"))
+        XCTAssertTrue(source.contains("conversationMessageAccessibilityLabel(message)"))
+        XCTAssertEqual(
+            conversationMessageAccessibilityLabel(LocalProductChatMessage(
+                messageID: "proposal-accessibility", role: "proposal",
+                content: "Needs review", tentative: false
+            )),
+            "ZoriDesk proposal, untrusted: Needs review"
+        )
         XCTAssertTrue(source.contains(#"message.role == "proposal""#))
 		XCTAssertTrue(source.contains("conversationDisclosureSummary"))
 		XCTAssertTrue(source.contains("Context shared"))
