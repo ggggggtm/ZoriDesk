@@ -226,3 +226,15 @@ Q12整项完成依据见[TASKS验收矩阵](TASKS.md#q12让诊断可理解可操
 本地实际编译旧Core/UI调用`conversationTranscriptText`先RED（旧前缀不符）；最小修复后同探针GREEN，实际展示/读屏标签函数与Stop动作探针通过，应用编译通过。探针不实例化Store、不读取用户数据/凭证，不是完整聊天GUI、实际VoiceOver或E2E；本机CLT确实缺XCTest，正式38项及原Go普通/race由推送后的对应CI实际执行。Q06整体仍进行中，当前分支待审、不合main；窗口/侧栏不再修改，连接/错误、Vault、包元数据未在本切片改动。
 
 本次只读剩余审计还确认了路由披露/权限与恢复说明、Roundtable创建引导、工具形态安全警告正文的旧名，均有生产展示调用。后者是前缀切片刻意保留的内容，不是未完成同一个前缀修复；后续只能改品牌词并保留安全语义。具体清单见[TASKS的Q06范围](TASKS.md#q06统一用户可见品牌)，不是安装后菜单或真实VoiceOver实测。下一次先选连接状态小切片，不动已验收聊天、Q12诊断逻辑或Q07/Q08标识，本轮不顺带实现。
+
+### 六处连接展示，不改连接状态机（2026-11-04）
+
+验收更新：d91923e完整八文件经再次及新的独立只读review无阻断，按维护者明确授权保留历史合main。[分支CI41769618780](https://github.com/ggggggtm/ZoriDesk/actions/runs/41769618780)准确对应d91923e，已读取原始日志：普通/race启动各625条、Sandbox各107条，macOS编译及43项XCTest通过无skip，三项新测试逐项passed。本次合并CI单独核验，不借用分支成功；本轮不重跑未变化的本地基线。下方“待审”仅为原交付状态，不能据此重复实现。
+
+分支`fix/connection-status-branding`仅在LocalProductCopy集中四条连接detail及Mission连接标题/loading横幅，原四个Core分支和两处Mission位置引用常量。loading/online/partial/offline的品牌词更新；stale、offline保留快照、fatal等非品牌文案及所有state/title/icon/offersRefresh、内容映射保持。Mission的snapshot判断和authorityBanner各分支/刷新入口未重构，也不改ContentView启动、刷新与恢复并行顺序。
+
+三项新回归与两项既有检查追加到原38项门禁后共43项：四条品牌词和两个Mission常量、nil/空/非空快照的状态与内容保留、真实Mission接线，以及原私有reason拒显和ContentView恢复顺序。仍逐项要求passed并拒skip/空选。另逐字源码对照验证，排除精确4+2处展示引用替换后，Core映射和整个Mission文件等同main。
+
+本地旧实际Core探针RED退出1，修复后同探针在12个nil/保留快照状态场景GREEN，另Mission标签常量检查通过；修改后应用构建通过。没有实例化Store、调用真实刷新/恢复或连接服务，不能称网络恢复或安装后GUI E2E通过；CLT缺XCTest，正式43项及原Go普通/race交由对应提交CI实际执行。当前待审、不合main，Q06仍有其他文案未完成，不重复窗口/侧栏/聊天或更改Q12逻辑。
+
+本次剩余核验仅做源码与生产调用链检查：Mission设置恢复提示、执行失败与chatFailure等故障建议；路由披露/权限/Roundtable说明；toolShapedWarning中的品牌词；Vault页面/导出建议文件名前缀；Info.plist两个显示名称仍未统一，见[TASKS的Q06范围](TASKS.md#q06统一用户可见品牌)。这不是安装后界面实测；工具警告必须保留“未执行”，Vault扩展名/格式及服务路径等兼容标识不在机械替换范围。没有顺带实现下一切片，Q06不能标done。

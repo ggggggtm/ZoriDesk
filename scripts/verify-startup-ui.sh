@@ -60,6 +60,17 @@ chat_view_tests=(
   testWorkspaceShellConsumesAgentTeamBuilderSession
 )
 chat_view_filter=$(IFS='|'; echo "${chat_view_tests[*]}")
+connection_state_tests=(
+  testConnectionBrandCopyUsesProductName
+  testConnectionBrandingPreservesStatesRefreshAndSnapshots
+  testConnectionCopyDescribesLocalServiceWithoutTransportReasons
+)
+connection_state_filter=$(IFS='|'; echo "${connection_state_tests[*]}")
+connection_view_tests=(
+  testMissionConnectionBrandWiringPreservesRefreshAndRecovery
+  testContentViewStartsSetupRecoveryAlongsideInitialRefreshes
+)
+connection_view_filter=$(IFS='|'; echo "${connection_view_tests[*]}")
 report=$(mktemp "${TMPDIR:-/tmp}/zoridesk-startup-ui.XXXXXX")
 trap 'rm -f -- "$report"' EXIT
 trap 'exit 130' INT
@@ -67,15 +78,15 @@ trap 'exit 143' TERM
 swift --version
 # Package.swift has no remote dependencies. Do not install tools or resolve updates.
 swift test --package-path apps/macos --disable-automatic-resolution --jobs 2 \
-  --filter "LocalProductStoreTests/($filter)$|LocalDiagnosticBundleTests/($diagnostic_filter)$|LoomGraphiteViewTests/($brand_filter|$chat_view_filter)$|LoomWorkspaceShellStateTests/($chat_state_filter)$" 2>&1 | tee "$report"
+  --filter "LocalProductStoreTests/($filter)$|LocalDiagnosticBundleTests/($diagnostic_filter)$|LoomGraphiteViewTests/($brand_filter|$chat_view_filter|$connection_view_filter)$|LoomWorkspaceShellStateTests/($chat_state_filter)$|LocalProductExperienceTests/($connection_state_filter)$" 2>&1 | tee "$report"
 if grep -Ei 'Test Case.*(skipped|failed)' "$report"; then
   echo "FAIL: skipped or failed XCTest case" >&2
   exit 1
 fi
-for test_name in "${tests[@]}" "${diagnostic_tests[@]}" "${brand_tests[@]}" "${chat_state_tests[@]}" "${chat_view_tests[@]}"; do
+for test_name in "${tests[@]}" "${diagnostic_tests[@]}" "${brand_tests[@]}" "${chat_state_tests[@]}" "${chat_view_tests[@]}" "${connection_state_tests[@]}" "${connection_view_tests[@]}"; do
   if ! grep -F "$test_name" "$report" | grep -F 'passed (' >/dev/null; then
     echo "FAIL: missing passing result for $test_name" >&2
     exit 1
   fi
 done
-echo "Verified all $((${#tests[@]} + ${#diagnostic_tests[@]} + ${#brand_tests[@]} + ${#chat_state_tests[@]} + ${#chat_view_tests[@]})) selected XCTest cases passed; no skips."
+echo "Verified all $((${#tests[@]} + ${#diagnostic_tests[@]} + ${#brand_tests[@]} + ${#chat_state_tests[@]} + ${#chat_view_tests[@]} + ${#connection_state_tests[@]} + ${#connection_view_tests[@]})) selected XCTest cases passed; no skips."
