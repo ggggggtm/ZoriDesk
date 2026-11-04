@@ -4106,7 +4106,7 @@ public struct MissionWorkbench: View {
       if store.snapshot == nil {
         truthfulState(
           icon: "bolt.horizontal.circle",
-          title: "Connecting to Loom",
+          title: LocalProductCopy.missionConnectingTitle,
           detail: "The last authoritative view remains visible if refresh fails."
         )
       } else if store.workbench.missions.isEmpty {
@@ -7476,7 +7476,7 @@ public struct MissionWorkbench: View {
     case .online:
       return nil
     case .loading:
-      return "Starting the Loom service on this Mac"
+      return LocalProductCopy.missionStartingServiceBanner
     case .partial:
       return "Some information could not be loaded safely"
     case .stale:

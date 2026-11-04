@@ -31,6 +31,12 @@ public enum LocalProductCopy {
     public static let chatProposalName = "\(productName) proposal"
     public static let chatComposerPlaceholder = "Ask \(productName) or describe a task"
     public static let chatRespondingAccessibilityLabel = "\(productName) is responding"
+    public static let connectionCheckingDetail = "\(productName) is checking the service on this Mac."
+    public static let connectionOnlineDetail = "This view comes from the resident \(productName) service."
+    public static let connectionPartialDetail = "\(productName) is showing the information it could safely load."
+    public static let connectionReconnectingDetail = "\(productName) reconnects automatically. Try again if this continues."
+    public static let missionConnectingTitle = "Connecting to \(productName)"
+    public static let missionStartingServiceBanner = "Starting the \(productName) service on this Mac"
     public static let homeTitle = "Your local agent workspace"
     public static let homeSubtitle =
         "Follow delegated work, team activity, and items that need you."
@@ -116,7 +122,7 @@ public struct LocalProductExperience: Equatable, Sendable {
             state = .loading
             connection = .init(
                 title: "Starting local service",
-                detail: "Loom is checking the service on this Mac.",
+                detail: LocalProductCopy.connectionCheckingDetail,
                 systemImage: "arrow.triangle.2.circlepath",
                 offersRefresh: false
             )
@@ -131,7 +137,7 @@ public struct LocalProductExperience: Equatable, Sendable {
             state = hasContent ? .connectedPopulated : .connectedEmpty
             connection = .init(
                 title: "Local service connected",
-                detail: "This view comes from the resident Loom service.",
+                detail: LocalProductCopy.connectionOnlineDetail,
                 systemImage: "checkmark.circle.fill",
                 offersRefresh: false
             )
@@ -139,7 +145,7 @@ public struct LocalProductExperience: Equatable, Sendable {
             state = .partial
             connection = .init(
                 title: "Some information is unavailable",
-                detail: "Loom is showing the information it could safely load.",
+                detail: LocalProductCopy.connectionPartialDetail,
                 systemImage: "exclamationmark.triangle.fill",
                 offersRefresh: true
             )
@@ -156,7 +162,7 @@ public struct LocalProductExperience: Equatable, Sendable {
                 state = .offline
                 connection = .init(
                     title: "Local service unavailable",
-                    detail: "Loom reconnects automatically. Try again if this continues.",
+                    detail: LocalProductCopy.connectionReconnectingDetail,
                     systemImage: "bolt.slash.fill",
                     offersRefresh: true
                 )

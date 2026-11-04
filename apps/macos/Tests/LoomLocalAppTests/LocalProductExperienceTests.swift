@@ -3,6 +3,69 @@ import XCTest
 @testable import LoomLocalAppCore
 
 final class LocalProductExperienceTests: XCTestCase {
+    func testConnectionBrandCopyUsesProductName() {
+        let cases: [(LocalProductConnectionState, String)] = [
+            (.loading, "ZoriDesk is checking the service on this Mac."),
+            (.online, "This view comes from the resident ZoriDesk service."),
+            (.partial(reason: "private-partial"), "ZoriDesk is showing the information it could safely load."),
+            (.offline(reason: "private-offline"), "ZoriDesk reconnects automatically. Try again if this continues."),
+        ]
+        for (state, detail) in cases {
+            XCTAssertEqual(
+                LocalProductExperience(snapshot: nil, connectionState: state).connection.detail,
+                detail
+            )
+        }
+        XCTAssertEqual(LocalProductCopy.connectionCheckingDetail, "ZoriDesk is checking the service on this Mac.")
+        XCTAssertEqual(LocalProductCopy.connectionOnlineDetail, "This view comes from the resident ZoriDesk service.")
+        XCTAssertEqual(LocalProductCopy.connectionPartialDetail, "ZoriDesk is showing the information it could safely load.")
+        XCTAssertEqual(LocalProductCopy.connectionReconnectingDetail, "ZoriDesk reconnects automatically. Try again if this continues.")
+        XCTAssertEqual(LocalProductCopy.missionConnectingTitle, "Connecting to ZoriDesk")
+        XCTAssertEqual(LocalProductCopy.missionStartingServiceBanner, "Starting the ZoriDesk service on this Mac")
+    }
+
+    func testConnectionBrandingPreservesStatesRefreshAndSnapshots() throws {
+        let empty = LocalProductSnapshot.empty(viewVersion: "view-preserved")
+        let populated = try ExperienceFixtures.populatedSnapshot()
+        let cases: [(LocalProductSnapshot?, LocalProductConnectionState, LocalProductExperienceState, String, String, Bool)] = [
+            (nil, .loading, .loading, "Starting local service", "arrow.triangle.2.circlepath", false),
+            (populated, .loading, .loading, "Starting local service", "arrow.triangle.2.circlepath", false),
+            (empty, .online, .connectedEmpty, "Local service connected", "checkmark.circle.fill", false),
+            (populated, .online, .connectedPopulated, "Local service connected", "checkmark.circle.fill", false),
+            (populated, .partial(reason: "private-partial"), .partial, "Some information is unavailable", "exclamationmark.triangle.fill", true),
+            (nil, .stale(reason: "private-stale"), .stalePreserved, "Showing last loaded state", "clock.badge.exclamationmark", true),
+            (nil, .offline(reason: "private-offline"), .offline, "Local service unavailable", "bolt.slash.fill", true),
+            (empty, .offline(reason: "private-offline"), .offlinePreserved, "Showing last loaded state", "bolt.slash.fill", true),
+            (populated, .fatal(reason: "private-fatal"), .fatal, "Local service rejected the connection", "exclamationmark.octagon.fill", true),
+        ]
+        for (snapshot, state, expectedState, title, icon, refresh) in cases {
+            let experience = LocalProductExperience(snapshot: snapshot, connectionState: state)
+            XCTAssertEqual(experience.state, expectedState)
+            XCTAssertEqual(experience.connection.title, title)
+            XCTAssertEqual(experience.connection.systemImage, icon)
+            XCTAssertEqual(experience.connection.offersRefresh, refresh)
+            XCTAssertFalse(experience.connection.detail.contains("private-"))
+            XCTAssertEqual(experience.workActivity.map(\.runID), snapshot?.runs.map(\.runID) ?? [])
+            XCTAssertEqual(experience.acceptedEvidence.map(\.evidenceID), snapshot?.evidence.map(\.evidenceID) ?? [])
+            XCTAssertEqual(experience.attention.count, snapshot?.attention.count ?? 0)
+            XCTAssertEqual(experience.teams.count, snapshot?.teams.count ?? 0)
+            XCTAssertEqual(experience.runtimes.count, snapshot?.runtimes.count ?? 0)
+            XCTAssertEqual(experience.homeGroups, [.attention, .workActivity, .teams, .systemReadiness])
+        }
+        XCTAssertEqual(
+            LocalProductExperience(snapshot: nil, connectionState: .stale(reason: "private-stale")).connection.detail,
+            "Reconnect to refresh this workspace."
+        )
+        XCTAssertEqual(
+            LocalProductExperience(snapshot: empty, connectionState: .offline(reason: "private-offline")).connection.detail,
+            "The local service is unavailable. Your workspace is preserved."
+        )
+        XCTAssertEqual(
+            LocalProductExperience(snapshot: populated, connectionState: .fatal(reason: "private-fatal")).connection.detail,
+            "Check the local service configuration, then try again."
+        )
+    }
+
     func testPrimaryDestinationsAreTaskFirstAndBounded() {
         XCTAssertEqual(
             LocalProductWorkspaceState().tasks.map(\.title),
@@ -124,7 +187,7 @@ final class LocalProductExperienceTests: XCTestCase {
         XCTAssertEqual(offline.title, "Local service unavailable")
         XCTAssertEqual(
             offline.detail,
-            "Loom reconnects automatically. Try again if this continues."
+            "ZoriDesk reconnects automatically. Try again if this continues."
         )
         XCTAssertEqual(preserved.title, "Showing last loaded state")
         XCTAssertEqual(fatal.title, "Local service rejected the connection")

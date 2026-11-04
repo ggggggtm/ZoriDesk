@@ -9,6 +9,51 @@ private var retainedMissionWorkbenchWindows: [NSWindow] = []
 
 @MainActor
 final class LoomGraphiteViewTests: XCTestCase {
+    func testMissionConnectionBrandWiringPreservesRefreshAndRecovery() async throws {
+        let packageRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let mission = try String(
+            contentsOf: packageRoot.appendingPathComponent("Sources/LoomLocalAppUI/MissionWorkbench.swift"),
+            encoding: .utf8
+        )
+        let boardStart = try XCTUnwrap(mission.range(of: "private var orchestrationBoard: some View"))
+        let boardEnd = try XCTUnwrap(mission.range(of: "private var missionFilter: Binding<String>"))
+        let board = String(mission[boardStart.lowerBound..<boardEnd.lowerBound])
+        XCTAssertTrue(board.contains("if store.snapshot == nil"))
+        XCTAssertTrue(board.contains("title: LocalProductCopy.missionConnectingTitle"))
+        XCTAssertTrue(board.contains("The last authoritative view remains visible if refresh fails."))
+        XCTAssertTrue(board.contains("Text(authorityBanner)"))
+        XCTAssertTrue(board.contains(".accessibilityLabel(authorityBanner)"))
+        let bannerStart = try XCTUnwrap(mission.range(of: "private var authorityBanner: String?"))
+        let bannerEnd = try XCTUnwrap(mission.range(of: "private var emptyBoardDetail: String"))
+        let banner = String(mission[bannerStart.lowerBound..<bannerEnd.lowerBound])
+        XCTAssertTrue(banner.contains("switch store.connectionState"))
+        XCTAssertTrue(banner.contains("case .online:\n      return nil"))
+        XCTAssertTrue(banner.contains("case .loading:\n      return LocalProductCopy.missionStartingServiceBanner"))
+        for detail in [
+            "Some information could not be loaded safely",
+            "Showing last loaded state until the service reconnects",
+            "Local service unavailable · try again from the workspace header",
+            "Local service rejected the connection · check local setup",
+        ] {
+            XCTAssertTrue(banner.contains(detail))
+        }
+        XCTAssertTrue(mission.contains("await store.refreshMission(id)"))
+        XCTAssertTrue(mission.contains("await store.refresh()"))
+        XCTAssertTrue(mission.contains("Task { await store.refreshSetup() }"))
+        let content = try String(
+            contentsOf: packageRoot.appendingPathComponent("Sources/LoomLocalAppUI/ContentView.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(content.contains("if refreshOnAppear"))
+        XCTAssertTrue(content.contains("await store.connectWithRetry("))
+        XCTAssertTrue(content.contains("async let recovery: Void = store.reconnectWhileUnavailable()"))
+        XCTAssertTrue(content.contains("async let setup: Void = store.refreshSetup()"))
+        XCTAssertTrue(content.contains("await recovery"))
+    }
+
     func testChatBrandWiringPreservesComposerAndCopyInteraction() async throws {
         let sourceURL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
