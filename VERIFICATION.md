@@ -250,3 +250,13 @@ Q12整项完成依据见[TASKS验收矩阵](TASKS.md#q12让诊断可理解可操
 `verify-sandbox.sh`和`verify-startup.sh`本地普通/race分别各107、625条记录均通过无跳过，Go源码、工作流与锁文件不变。此次不是完整GUI、实际恢复执行或模型E2E验收。桌面提示切片已复核、不重复；Q06仍进行中，剩余见[TASKS](TASKS.md#q06统一用户可见品牌)。
 
 剩余提示的来源已区分：Go `conversationFailureUserMessage` → 聊天API的安全消息/回复 → Swift `chatFailureDetail`，不能靠桌面fallback统一后端文案；远程工具绑定的预检`block_reason`由Mission直接显示，同时整个预检对象参与摘要。工具形态警告由Go API替换回复、Swift过滤器兜底，后续需区分新消息和历史文本，不改变拒绝执行语义。以上仅源码核验，未改余项的生产代码或做安装后界面实测。
+
+### HTTP 成功不等于 Provider 回复有效（2026-11-05）
+
+验收更新：1b49591完整8文件经再次完整及独立只读复核无阻断，按授权保留历史合main。[分支CI42022223574](https://github.com/ggggggtm/ZoriDesk/actions/runs/42022223574)准确对应1b49591，原始日志确认Go普通/race启动各626条、Sandbox各107条，以及macOS编译与55项XCTest通过无跳过；新增跨组件用例两种Go模式均执行。合并CI另验，本轮未重跑同一源码的本地基线。
+
+`fix/provider-response-branding`只在`conversationFailureUserMessage`替换`invalid_response`的固定品牌词。比如HTTP 200但助手内容为`null`，`invalidConversationHTTPResponse`仍给出`provider_http / invalid_response / response_content`且不可重试。Anthropic的模型/内容块校验也使用同一固定消息生成器。Router将固定消息传给聊天API，API生成可见回复并保存Attempt失败详情；Swift仍按原规则优先使用安全消息。没有修改原始响应解析、凭证、错误元数据、权限、重试、历史记录或预检摘要。
+
+既有OpenAI兼容及Anthropic用例加强品牌和分类断言；`TestConversationProfileRouterShowsBrandedInvalidResponse`经真实客户端、内存HTTP、Router与临时聊天API核验回复和Attempt（含HTTP200、事件号与非重试），同时检查API JSON和临时聊天存储无虚构原文/凭证。先在未改生产时观察四个场景因旧品牌失败，最小修复后同回归通过。`verify-startup.sh`只追加这一个测试选择，本地普通/race各626条，Sandbox各107条，无跳过；格式、锁文件和工作流范围检查通过。未调用真实Provider或验证安装后GUI；已验收固定句不再重复开发。
+
+余项核验：新绑定校验已拒绝不支持的适配器，旧提示属于兼容性防御路径，未现场复现。Mission主/回退预检节点分别直接显示`blockReason`、`fallbackBlockReason`，Swift节点没有独立`blockCode`，原Go预检参与摘要。若修复，在展示层精确映射已知固定旧句，保留未知文本、原字段和审批；不修改后端理由或重算摘要。诊断导出的`loom-diagnostics.json`是保存面板建议名，与Vault建议名均未改动。其余分类见[TASKS](TASKS.md#q06统一用户可见品牌)，没有顺带实现或实测安装后菜单。

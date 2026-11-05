@@ -309,8 +309,11 @@ func TestOpenAICompatibleConversationClassifiesSafeInvalidResponseReason(t *test
 	failure, ok := ConversationFailureDetails(err)
 	if !ok || failure.Code != "invalid_response" || failure.Stage != "provider_http" ||
 		failure.HTTPStatus != http.StatusOK || failure.ProviderCode != "response_content" ||
-		failure.Retryable {
+		failure.Retryable || failure.RetryAfterSeconds != 0 {
 		t.Fatalf("failure=%#v ok=%v error=%v", failure, ok, err)
+	}
+	if want := "Provider returned a response ZoriDesk could not safely accept."; failure.UserMessage != want {
+		t.Fatalf("failure message = %q, want %q", failure.UserMessage, want)
 	}
 }
 

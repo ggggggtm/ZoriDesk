@@ -632,6 +632,80 @@ func TestConversationProfileRouterPreservesSafeProviderHTTPFailure(t *testing.T)
 	}
 }
 
+func TestConversationProfileRouterShowsBrandedInvalidResponse(t *testing.T) {
+	const (
+		fakeSecret = "fixture-provider-response-key"
+		rawMarker  = "fixture-raw-invalid-response"
+		incidentID = "loom-chat-44444444-4444-4444-8444-444444444444"
+		want       = "Provider returned a response ZoriDesk could not safely accept."
+	)
+	client, err := provider.NewDeepSeekConversationClient(provider.DeepSeekConversationConfig{
+		Client: profileConversationHTTPDoerFunc(func(request *http.Request) (*http.Response, error) {
+			if request.Header.Get("Authorization") != "Bearer "+fakeSecret {
+				t.Fatal("request did not use the synthetic credential")
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK, Request: request,
+				Body: io.NopCloser(strings.NewReader(
+					`{"id":"` + rawMarker + `","model":"deepseek-chat","choices":[{"message":{"role":"assistant","content":null}}]}`,
+				)),
+			}, nil
+		}),
+		Timeout: time.Second, MaxResponseBytes: 4096,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	router, err := newProductConversationProfileRouter(nil, func(string) []projection.ProviderCredentialRecord {
+		return []projection.ProviderCredentialRecord{{
+			ProviderID: "deepseek", ProviderAccountID: "deepseek.primary",
+			CredentialReference: "credential-ref-provider-response", Revision: 6,
+			Status: "verified", AuthMode: "brokered",
+		}}
+	}, profileConversationLeasing(t, &profileConversationStore{secret: []byte(fakeSecret)}), client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chatPath := filepath.Join(t.TempDir(), "chat.json")
+	chat, err := api.NewPersistentLocalProductChatAPI(chatPath, time.Now, router)
+	if err != nil {
+		t.Fatal(err)
+	}
+	thread, err := chat.SendMessage(context.Background(), api.LocalProductChatMessageRequest{
+		ThreadID: "provider-invalid-response", ProfileID: provider.DeepSeekConversationProfileID(6),
+		Content: "hello", IncidentID: incidentID,
+	})
+	if err != nil || len(thread.Attempts) != 1 || len(thread.Messages) != 2 {
+		t.Fatalf("missing reply or terminal attempt: %v", err)
+	}
+	attempt := thread.Attempts[0]
+	if attempt.Status != "failed" || attempt.FailureCode != "invalid_response" ||
+		attempt.FailureStage != "provider_http" || attempt.HTTPStatus != http.StatusOK ||
+		attempt.ProviderCode != "response_content" || attempt.Retryable ||
+		attempt.RetryAfterSeconds != 0 || attempt.IncidentID != incidentID {
+		t.Fatal("API attempt changed classification, incident or retry fields")
+	}
+	if attempt.FailureMessage != want {
+		t.Errorf("API attempt failure message = %q, want %q", attempt.FailureMessage, want)
+	}
+	if got, wantReply := thread.Messages[1].Content, want+" HTTP 200 · response_content"; got != wantReply {
+		t.Errorf("API reply = %q, want %q", got, wantReply)
+	}
+	apiJSON, err := json.Marshal(thread)
+	if err != nil {
+		t.Fatal(err)
+	}
+	persisted, err := os.ReadFile(chatPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, data := range [][]byte{apiJSON, persisted} {
+		if strings.Contains(string(data), rawMarker) || strings.Contains(string(data), fakeSecret) {
+			t.Fatal("raw response marker or synthetic credential reached API or chat storage")
+		}
+	}
+}
+
 func TestConversationProfileRouterExcludesCredentialEchoFromPersistedDiagnostics(t *testing.T) {
 	const fakeSecret = "fixture-router-credential-123"
 	for _, test := range []struct{ name, code, want string }{

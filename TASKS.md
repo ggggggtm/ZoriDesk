@@ -24,7 +24,7 @@
 | Q03 | 贡献指南与反馈模板 | done | 2026-10-13 按维护者授权复核并合入 main；不改变 Issues 设置 |
 | Q04 | 架构、用户路径与源码导航 | in_progress | VERIFICATION.md 已补 Q05 的验证链路；完整用户路径仍未覆盖 |
 | Q05 | 无真实账号的测试基线与 CI | done | 2026-10-28 按授权复核 0b9e1ff 并合入 main；本地与分支 CI 普通/race 各 55 个事件通过，无跳过；限定 sandbox/testreport 基线 |
-| Q06 | 用户可见品牌统一 | in_progress | 窗口/侧栏/聊天、六处连接及61条桌面固定故障/恢复提示已验收；c30d7be按授权复核合main，分支CI42003275772普通/race及55项macOS无跳过，合并CI另验；余项见下表 |
+| Q06 | 用户可见品牌统一 | in_progress | 已验收窗口/侧栏/聊天、六处连接、61条桌面故障/恢复及Provider无效响应文案；1b49591复核合main，分支CI42022223574普通/race及55项macOS无跳过，合并CI另验；余项见下表 |
 | Q07 | 安装与服务标识迁移 | backlog | Q05、Q06；与 Q08 联合设计 |
 | Q08 | 数据路径、凭证与兼容策略 | backlog | Q07/Q08 联合方案先评审 |
 | Q09 | 执行输出限制与回归测试 | done | 2026-10-28 按明确授权复核 b40a0fe 并合入 main；本地与分支 CI 普通/race 各 91 条记录通过无跳过，仅验收 Loopback 有界输出 |
@@ -97,6 +97,8 @@ Q01、Q02 为 2026-10-13 初始化文档交付；只代表维护文档，不代�
 
 ### Q06：统一用户可见品牌
 
+最新验收（2026-11-05）：`fix/provider-response-branding`的1b49591经再次完整及独立只读复核无阻断，按授权保留历史合main。仅改`conversationFailureUserMessage`的`invalid_response`固定产品词；四个旧版品牌失败场景修复后均通过，分类、安全与非重试保持。对应分支CI42022223574与原始日志复核：启动/Provider普通/race各626条、Sandbox各107条、macOS编译及55项XCTest通过无跳过，新增跨组件用例在普通/race均实际运行。合并CI独立核验；不重复本切片或顺带实施余项。
+
 最新验收（2026-11-05）：`fix/failure-recovery-branding`的c30d7be经再次完整与独立复核无阻断，按维护者授权保留历史合main。仅将61条桌面固定故障和恢复提示的Loom产品词替换为`LocalProductCopy.productName`；状态判断、分类、权限、重试/恢复和传入安全消息保留。旧探针10项品牌失败，修复后17项全过，Swift构建与本地Go普通/race通过。分支CI42003275772准确SHA及原始日志复核：Go普通/race启动各625条、Sandbox各107条，macOS编译及55项XCTest通过无跳过（原43项+4新+8既有）。本次合并CI另验；不重复本切片、不把GUI或真实恢复E2E当作已验。
 
 最新验收（2026-11-04）：`fix/connection-status-branding`的d91923e基于main e7562c7，只替换四条连接detail和Mission连接标题/loading横幅，复用productName。三项回归先行、旧Core真实探针RED→GREEN，应用构建和12场景探针/Mission常量检查通过；除六处展示引用外，Core映射与Mission其余源码逐字不变。原38门禁保留加三新、受影响旧文案与原恢复顺序检查，共43项。完整八文件经再次及新的独立review无阻断，按授权保留历史合main；准确分支CI41769618780普通/race启动各625条、Sandbox各107条及43项macOS无skip，合并CI另验。本轮未重跑未变化本地基线；CLT无XCTest，不称本地XCTest或实际恢复E2E通过。六处展示不再待审、不重复开发，Q06整体仍in_progress。
@@ -107,13 +109,13 @@ Q01、Q02 为 2026-10-13 初始化文档交付；只代表维护文档，不代�
 
 | 剩余真实展示范围（源码核验，非全部界面实测） | 位置与边界 |
 | --- | --- |
-| 后端产出的故障提示 | 桌面61条已验收，不重复。`conversationFailureUserMessage`的`invalid_response`固定消息随API进入聊天回复和失败详情；不支持的远程工具绑定由预检`block_reason`显示。前者可先改消息生产者；后者的理由参与预检摘要，先确定显示边界，不改摘要验证、分类或整段替换传入消息 |
+| 远程工具兼容性预检 | `invalid_response`固定词已验收，不重复。新绑定校验已拒绝不支持的适配器，旧名残留在兼容性防御路径，不是新配置必现。Mission主/回退节点直接展示`block_reason`/`fallback_block_reason`，Swift没有独立`blockCode`。后续只在展示层精确映射已知固定理由，保留其他文本、原字段、摘要与审批 |
 | 路由、权限与治理说明 | `ConversationRouteTransitionSheet`的披露说明、Mission的恢复确认/权限模式/fallback说明、只读Review Gate的固定“Loom authority”展示、`RoundtableWorkbench.createSessionForm`引导仍用旧词。只动产品文案，保持权限、披露决策、真实请求者与治理标识 |
 | 工具形态安全警告正文 | Swift `toolShapedWarning`可进入消息、读屏与转录；Go API也会提前把工具形态回复替换为固定旧警告，单改Swift常量不能覆盖这条路径。后续核对新回复和旧记录的显示边界，保留“未执行”和原过滤，不重写历史消息 |
-| Vault页面与导出面板 | `MissionWorkbench.swift`的Vault标题、导入按钮/说明/帮助及`chooseDestinationAndExport`的建议文件名前缀仍Loom。显示前缀与`.loomvault`格式/类型、真实Vault存储namespace分开，不改后者 |
-| 应用包显示名称 | `Resources/Info.plist`的CFBundleDisplayName/CFBundleName仍Loom，构建脚本复制入包；后续需协调构建测试并隔离验证展示效果，本轮未运行安装后菜单。不得顺带改bundle ID、可执行文件、安装位置或服务标识 |
+| Vault与诊断导出展示 | `MissionWorkbench.swift`的Vault标题、导入按钮/说明/帮助、Vault导出的`Loom-Credential-Vault.loomvault`和诊断导出的`loom-diagnostics.json`仍是旧建议名。只评估保存面板的前缀与展示，保留`.loomvault`类型、JSON格式、诊断过滤和Vault存储namespace，不重复Q12 |
+| 应用包显示名称 | `Resources/Info.plist`的CFBundleDisplayName/CFBundleName仍Loom，构建脚本复制入包，包测试也断言原CFBundleName；后续同步测试并隔离核验两字段，实际安装后菜单未验。不得顺带改bundle ID、可执行文件、安装位置或服务标识 |
 
-不要机械替换协议角色`"loom"`、Harness ID `loom-native`、模块/服务/通知/环境变量、socket/数据库/Vault路径、来源版权或历史证据；`Loom Native`运行时别名需先确认指代。`InteractionContinuity.primaryFlow`的旧文案在限定搜索未发现生产引用，不列为活跃界面遗漏；继承的TUI显示名不并入本次macOS盘点。先确认本次合并CI，后续按小切片处理，不重复61条故障/恢复、六处连接或窗口/侧栏/聊天前缀。仍新类型/主题分支、回归/实际CI后待审，不自动合main，Q07/Q08迁移不提前。
+不要机械替换协议角色`"loom"`、Harness ID `loom-native`、模块/服务/通知/环境变量、socket/数据库/Vault路径、来源版权或历史证据；`Loom Native`运行时别名需先确认指代。`InteractionContinuity.primaryFlow`的旧文案在限定搜索未发现生产引用，不列为活跃界面遗漏；继承的TUI显示名不并入本次macOS盘点。先确认本次合并CI，后续按小切片处理，不重复Provider固定词、61条故障/恢复、六处连接或窗口/侧栏/聊天前缀。仍新类型/主题分支、回归/实际CI后待审，不自动合main，Q07/Q08迁移不提前。
 
 - 盘点窗口、菜单、设置和错误提示的 Loom 名称，分辨产品文案与必须保留的协议/版权标识。
 - 小批量修改并核对 UI；暂不全局替换模块名、数据库路径和凭证标识。
