@@ -200,7 +200,7 @@ final class LoomGraphiteViewTests: XCTestCase {
                 executionReachable: false,
                 setupState: .ready
             ),
-            "Mission preflight cannot reach Loom's local execution service. Open Runtime & Providers to refresh local service readiness, then retry."
+            "Mission preflight cannot reach ZoriDesk's local execution service. Open Runtime & Providers to refresh local service readiness, then retry."
         )
     }
 
@@ -217,6 +217,54 @@ final class LoomGraphiteViewTests: XCTestCase {
         XCTAssertTrue(
             missionSetupRecoveryPresentation(.loading).isLoading
         )
+    }
+
+    func testMissionRecoveryBrandingPreservesSetupAndPreflightStates() async {
+        let unavailable = LocalProductSetupState.unavailable(reason: "private-setup-reason")
+        let fatal = LocalProductSetupState.fatal(reason: "private-fatal-reason")
+        let setupCases: [(LocalProductSetupState, String, String, Bool)] = [
+            (.idle, "Loading Runtime & Providers",
+             "Waiting for ZoriDesk's local setup service.", true),
+            (.loading, "Loading Runtime & Providers",
+             "Waiting for ZoriDesk's local setup service.", true),
+            (unavailable, "Runtime & Providers unavailable",
+             "ZoriDesk's local setup service did not return a setup snapshot. Choose Try Again to reconnect and reload it.", false),
+            (fatal, "Runtime & Providers need recovery",
+             "The local setup service could not load setup state. Restart the local ZoriDesk service, then choose Try Again.", false),
+            (.unavailable(reason: "empty_setup"), "Setup inventory is rebuilding",
+             "The local setup service returned an incomplete inventory. Choose Try Again to recover Runtime and Provider readiness.", false),
+            (.ready, "Setup inventory is rebuilding",
+             "Runtime and Provider setup is not available yet. Choose Try Again to reload it.", false),
+        ]
+        for (state, title, detail, isLoading) in setupCases {
+            XCTAssertEqual(
+                missionSetupRecoveryPresentation(state),
+                MissionSetupRecoveryPresentation(title: title, detail: detail, isLoading: isLoading)
+            )
+        }
+        for state in [unavailable, fatal] {
+            XCTAssertEqual(
+                missionRuntimeRecoveryReason(
+                    hasExecutableTeam: false,
+                    executionReachable: true,
+                    setupState: state
+                ),
+                "ZoriDesk's local setup service cannot confirm an executable Team. Open Runtime & Providers, choose Try Again, then retry preflight."
+            )
+        }
+        XCTAssertEqual(
+            missionRuntimeRecoveryReason(
+                hasExecutableTeam: false,
+                executionReachable: true,
+                setupState: .loading
+            ),
+            "Runtime and Provider readiness is still loading. Open Runtime & Providers to refresh the local setup service, then retry."
+        )
+        XCTAssertNil(missionRuntimeRecoveryReason(
+            hasExecutableTeam: true,
+            executionReachable: true,
+            setupState: fatal
+        ))
     }
 
     func testRuntimeAvailabilityExplainsDetectedHarnessWithoutAgentAccount() {

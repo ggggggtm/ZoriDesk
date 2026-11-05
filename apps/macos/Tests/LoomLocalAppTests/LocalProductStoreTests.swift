@@ -20,6 +20,13 @@ private struct RoundtableSensitiveLocalizedError: LocalizedError {
 
 @MainActor
 final class LocalProductStoreTests: XCTestCase {
+  private func isolatedFailurePresentationSessionsURL() -> URL {
+    let directory = FileManager.default.temporaryDirectory
+      .appendingPathComponent("zoridesk-failure-presentation-\(UUID().uuidString)")
+    addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+    return directory.appendingPathComponent("chat-sessions.json")
+  }
+
   func testRoundtableUnknownErrorUsesSafeRecoveryMessage() async {
     let error = NSError(
       domain: "private-roundtable-error", code: 1,
@@ -250,7 +257,9 @@ final class LocalProductStoreTests: XCTestCase {
         recoverable: false
       )
     )
-    let store = LocalProductStore(client: client)
+    let store = LocalProductStore(
+      client: client, chatSessionsFileURL: isolatedFailurePresentationSessionsURL()
+    )
     await store.refreshSetup()
 
     await store.connectProvider(providerID: "deepseek", secret: "sk-test")
@@ -259,7 +268,7 @@ final class LocalProductStoreTests: XCTestCase {
     XCTAssertEqual(store.providerOperationStatus["deepseek"], "Credential Vault unavailable")
     XCTAssertEqual(
       store.providerOperationDetail["deepseek"],
-      "Loom could not safely complete this Credential Vault operation. Review diagnostics and try again."
+      "ZoriDesk could not safely complete this Credential Vault operation. Review diagnostics and try again."
     )
   }
 
@@ -273,7 +282,9 @@ final class LocalProductStoreTests: XCTestCase {
         incidentID: "loom-swift-11111111-1111-4111-8111-111111111111"
       )
     )
-    let store = LocalProductStore(client: client)
+    let store = LocalProductStore(
+      client: client, chatSessionsFileURL: isolatedFailurePresentationSessionsURL()
+    )
     await store.refreshSetup()
 
     await store.connectProvider(providerID: "deepseek", secret: "sk-test")
@@ -281,7 +292,7 @@ final class LocalProductStoreTests: XCTestCase {
     XCTAssertEqual(store.providerOperationStatus["deepseek"], "Credential Vault unavailable")
     XCTAssertEqual(
       store.providerOperationDetail["deepseek"],
-      "macOS could not verify Loom's bundled credential helper. Reinstall or reopen Loom, then try again."
+      "macOS could not verify ZoriDesk's bundled credential helper. Reinstall or reopen ZoriDesk, then try again."
     )
     XCTAssertEqual(
       store.providerOperationIncidentID["deepseek"],
@@ -617,6 +628,72 @@ final class LocalProductStoreTests: XCTestCase {
       "remote-tool-incident-1"
     )
     XCTAssertEqual(store.remoteToolEnrollmentRetryable["mcp-deepseek-work"], true)
+  }
+
+  func testAccountAndToolFailureBrandingPreservesDiagnosticsAndSetup() async throws {
+    let client = try ProviderSetupStubClient(
+      deepSeekEnabled: true,
+      providerPolicyError: LocalIPCRemoteError(
+        code: .denied, recoverable: false, incidentID: "limits-incident"
+      ),
+      providerRateCardError: LocalIPCRemoteError(
+        code: .denied, recoverable: false, incidentID: "rates-incident"
+      ),
+      remoteToolEnrollmentConfigured: true,
+      remoteToolConfigureError: LocalIPCRemoteError(
+        code: .denied, recoverable: false, stage: .daemonAdmission, incidentID: "tool-incident"
+      )
+    )
+    let store = LocalProductStore(
+      client: client, chatSessionsFileURL: isolatedFailurePresentationSessionsURL()
+    )
+    await store.refreshSetup()
+    await store.connectProvider(
+      providerID: "deepseek", providerAccountID: "deepseek.work", secret: "sk-test"
+    )
+    let before = store.setupSnapshot
+
+    let limitsSaved = await store.configureProviderAccountPolicy(
+      providerID: "deepseek", providerAccountID: "deepseek.work",
+      expectedRevision: 0, maximumConcurrentAttempts: 4,
+      dispatchWindowSeconds: 60, maximumDispatchStarts: 20,
+      maximumAssignedBudgetUnits: 12_000, trustDomain: "external_provider",
+      retentionMode: "provider_default", dataRegion: "global"
+    )
+    let rateSaved = await store.configureProviderModelRateCard(
+      providerID: "deepseek", providerAccountID: "deepseek.work",
+      modelID: "deepseek-chat", expectedRevision: 0, currency: "USD",
+      inputTokenBasis: "input_excludes_cache", inputMicrounitsPerMillion: 270_000,
+      outputMicrounitsPerMillion: 1_100_000, cacheReadMicrounitsPerMillion: 70_000,
+      cacheWriteMicrounitsPerMillion: 0
+    )
+    let toolSaved = await store.configureRemoteToolBackend(
+      LocalProductRemoteToolBackendEnrollmentCommand.fixture(expectedRevision: 1)
+    )
+
+    XCTAssertFalse(limitsSaved)
+    XCTAssertFalse(rateSaved)
+    XCTAssertFalse(toolSaved)
+    XCTAssertEqual(client.providerPolicyRequests.count, 1)
+    XCTAssertEqual(client.providerRateCardRequests.count, 1)
+    XCTAssertEqual(client.remoteToolConfigureRequests.count, 1)
+    XCTAssertEqual(store.setupState, .ready)
+    XCTAssertEqual(store.setupSnapshot, before)
+    XCTAssertEqual(
+      store.providerPolicyOperationDetail["deepseek.work"],
+      "ZoriDesk could not save these account limits · Incident limits-incident"
+    )
+    XCTAssertEqual(
+      store.providerRateCardOperationDetail["deepseek.work\u{1f}deepseek-chat"],
+      "ZoriDesk could not save this rate card · Incident rates-incident"
+    )
+    XCTAssertEqual(
+      store.remoteToolEnrollmentOperationDetail["mcp-deepseek-work"],
+      "ZoriDesk could not save this remote tool · Incident tool-incident"
+    )
+    XCTAssertEqual(store.remoteToolEnrollmentIncidentID["mcp-deepseek-work"], "tool-incident")
+    XCTAssertEqual(store.remoteToolEnrollmentStage["mcp-deepseek-work"], "Local service admission")
+    XCTAssertEqual(store.remoteToolEnrollmentRetryable["mcp-deepseek-work"], false)
   }
 
   func testWorkspaceAttentionUsesActionContextAndKindFallback() async throws {
@@ -4177,7 +4254,9 @@ final class LocalProductStoreTests: XCTestCase {
         )
       )
     )
-    let store = LocalProductStore(client: client)
+    let store = LocalProductStore(
+      client: client, chatSessionsFileURL: isolatedFailurePresentationSessionsURL()
+    )
     client.replaceRecordedThread(
       LocalProductChatThread(
         threadID: store.currentChatThreadID(),
@@ -4201,7 +4280,7 @@ final class LocalProductStoreTests: XCTestCase {
     XCTAssertFalse(store.chatOperationFailure?.recoverable ?? true)
     XCTAssertEqual(store.chatOperationFailure?.title, "Conversation migration incomplete")
     XCTAssertTrue(
-      store.chatOperationFailure?.detail.contains("reopen Loom") ?? false
+      store.chatOperationFailure?.detail.contains("reopen ZoriDesk") ?? false
     )
   }
 
@@ -4304,7 +4383,10 @@ final class LocalProductStoreTests: XCTestCase {
         incidentID: incidentID
       )
     )
-    let store = LocalProductStore(client: client, initialSetupSnapshot: setup)
+    let store = LocalProductStore(
+      client: client, initialSetupSnapshot: setup,
+      chatSessionsFileURL: isolatedFailurePresentationSessionsURL()
+    )
     client.replaceRecordedThread(LocalProductChatThread(
       threadID: store.currentChatThreadID(),
       messages: [],
@@ -4322,7 +4404,7 @@ final class LocalProductStoreTests: XCTestCase {
       "Model Provider credential required"
     )
     XCTAssertTrue(
-      store.chatOperationFailure?.detail.contains("no verified Loom account")
+      store.chatOperationFailure?.detail.contains("no verified ZoriDesk account")
         ?? false
     )
   }
@@ -4495,6 +4577,43 @@ final class LocalProductStoreTests: XCTestCase {
       store.chatOperationFailure?.incidentID,
       store.chatThread?.attempts.last?.incidentID
     )
+  }
+
+  func testChatFailureBrandingPreservesSafeMessageAndRetryMetadata() async throws {
+    let setup = try conversationProfileSetupSnapshot()
+    let incidentID = "loom-chat-provider-invalid-response-fixture"
+    let serverMessage = "Provider supplied a safe message containing Loom."
+    let fallback = "The selected Provider returned a response ZoriDesk could not safely accept."
+    for safeMessage in ["", serverMessage] {
+      let client = ChatRecordingClient(sendError: LocalIPCRemoteError(
+        code: .invalidResponse, recoverable: true, stage: .providerHTTP,
+        incidentID: incidentID, httpStatus: 502, providerCode: "invalid_format",
+        safeMessage: safeMessage, retryAfterSeconds: 18
+      ))
+      let store = LocalProductStore(
+        client: client, initialSetupSnapshot: setup,
+        chatSessionsFileURL: isolatedFailurePresentationSessionsURL()
+      )
+      store.selectConversationProfile("conversation-deepseek-deepseek-chat-r2")
+
+      await store.sendChatMessage("retry this draft")
+
+      let failure = try XCTUnwrap(store.chatOperationFailure)
+      XCTAssertEqual(client.sendCallCount, 1)
+      XCTAssertEqual(store.workspace.selectedContinuity.composerDraft, "retry this draft")
+      XCTAssertEqual(failure.code, .invalidResponse)
+      XCTAssertEqual(failure.stage, .providerHTTP)
+      XCTAssertEqual(failure.incidentID, incidentID)
+      XCTAssertTrue(failure.recoverable)
+      XCTAssertEqual(failure.httpStatus, 502)
+      XCTAssertEqual(failure.providerCode, "invalid_format")
+      XCTAssertEqual(failure.retryAfterSeconds, 18)
+      XCTAssertEqual(failure.title, "Invalid Provider response")
+      XCTAssertEqual(
+        failure.detail,
+        (safeMessage.isEmpty ? fallback : serverMessage) + " HTTP 502 · invalid_format · retry after 18s"
+      )
+    }
   }
 
   func testProviderRouteFailuresOfferSwitchProviderRecovery() {
@@ -5156,6 +5275,41 @@ final class LocalProductStoreTests: XCTestCase {
     XCTAssertTrue(store.agentRecoveryFailure?.detail.contains("Refresh") ?? false)
   }
 
+  func testAgentRecoveryTimeoutBrandingPreservesRefreshAndConfirmationBoundary() async throws {
+    let incidentID = "loom-agent-recovery-timeout-fixture"
+    let client = AgentRecoveryStubClient(resumeError: LocalIPCRemoteError(
+      code: .timeout, recoverable: true, stage: .agentAttemptReconcile,
+      incidentID: incidentID
+    ))
+    let store = LocalProductStore(
+      client: client, chatSessionsFileURL: isolatedFailurePresentationSessionsURL()
+    )
+    await store.previewAgentAttemptRecoveries()
+    let candidate = try XCTUnwrap(store.agentRecoveryCandidates.first)
+    XCTAssertFalse(store.canResumeAgentAttemptRecovery(candidate))
+    await store.confirmAgentAttemptRecovery(candidate, principalID: "local-user")
+    XCTAssertTrue(store.canResumeAgentAttemptRecovery(candidate))
+
+    await store.resumeAgentAttemptRecovery(candidate)
+
+    let failure = try XCTUnwrap(store.agentRecoveryFailure)
+    XCTAssertEqual(failure.code, .timeout)
+    XCTAssertEqual(failure.stage, .agentAttemptReconcile)
+    XCTAssertEqual(failure.incidentID, incidentID)
+    XCTAssertTrue(failure.recoverable)
+    XCTAssertEqual(failure.title, "Recovery timed out")
+    XCTAssertEqual(
+      failure.detail,
+      "ZoriDesk could not confirm the recovery outcome. Refresh candidates before retrying."
+    )
+    XCTAssertEqual(client.requests.map(\.operation), [.preview, .confirm, .resume])
+    XCTAssertTrue(store.agentRecoveryCandidates.isEmpty)
+    XCTAssertFalse(store.canResumeAgentAttemptRecovery(candidate))
+    await store.resumeAgentAttemptRecovery(candidate)
+    XCTAssertEqual(client.requests.map(\.operation), [.preview, .confirm, .resume])
+    XCTAssertEqual(store.agentRecoveryFailure?.code, .humanRequired)
+  }
+
   func testAgentAttemptRecoveryDoesNotDispatchDuplicateResume() async throws {
     let client = AgentRecoveryStubClient(suspendResume: true)
     let store = LocalProductStore(client: client)
@@ -5178,7 +5332,9 @@ final class LocalProductStoreTests: XCTestCase {
 
   func testToolRecoveryRequiresFreshPreviewAndAdvertisedAction() async throws {
     let client = ToolRecoveryStubClient()
-    let store = LocalProductStore(client: client)
+    let store = LocalProductStore(
+      client: client, chatSessionsFileURL: isolatedFailurePresentationSessionsURL()
+    )
 
     await store.resolveToolRecovery(
       try client.candidate(), action: .abortAttempt
@@ -5196,6 +5352,12 @@ final class LocalProductStoreTests: XCTestCase {
 
     XCTAssertEqual(client.requests.map(\.operation), [.preview])
     XCTAssertEqual(store.toolRecoveryFailure?.code, .humanRequired)
+    XCTAssertEqual(store.toolRecoveryFailure?.stage, .toolRecovery)
+    XCTAssertEqual(store.toolRecoveryFailure?.recoverable, false)
+    XCTAssertEqual(
+      store.toolRecoveryFailure?.detail,
+      "Refresh the exact ToolCall candidate and choose one of its available governed actions. ZoriDesk will not rerun the original call."
+    )
   }
 
   func testToolRecoveryAbortConsumesExactCandidateAndRefreshesProjection() async throws {

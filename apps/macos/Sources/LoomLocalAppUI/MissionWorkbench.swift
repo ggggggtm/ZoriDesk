@@ -60,14 +60,14 @@ func missionRuntimeRecoveryReason(
   setupState: LocalProductSetupState
 ) -> String? {
   guard executionReachable else {
-    return "Mission preflight cannot reach Loom's local execution service. Open Runtime & Providers to refresh local service readiness, then retry."
+    return "Mission preflight cannot reach \(LocalProductCopy.productName)'s local execution service. Open Runtime & Providers to refresh local service readiness, then retry."
   }
   guard !hasExecutableTeam else { return nil }
   switch setupState {
   case .idle, .loading:
     return "Runtime and Provider readiness is still loading. Open Runtime & Providers to refresh the local setup service, then retry."
   case .unavailable, .fatal:
-    return "Loom's local setup service cannot confirm an executable Team. Open Runtime & Providers, choose Try Again, then retry preflight."
+    return "\(LocalProductCopy.productName)'s local setup service cannot confirm an executable Team. Open Runtime & Providers, choose Try Again, then retry preflight."
   case .ready:
     return "No confirmed Team currently has executable Runtime and Provider bindings. Open Runtime & Providers to reconnect them, then retry."
   }
@@ -86,7 +86,7 @@ func missionSetupRecoveryPresentation(
   case .idle, .loading:
     return MissionSetupRecoveryPresentation(
       title: "Loading Runtime & Providers",
-      detail: "Waiting for Loom's local setup service.",
+      detail: "Waiting for \(LocalProductCopy.productName)'s local setup service.",
       isLoading: true
     )
   case .unavailable(let reason):
@@ -99,13 +99,13 @@ func missionSetupRecoveryPresentation(
     }
     return MissionSetupRecoveryPresentation(
       title: "Runtime & Providers unavailable",
-      detail: "Loom's local setup service did not return a setup snapshot. Choose Try Again to reconnect and reload it.",
+      detail: "\(LocalProductCopy.productName)'s local setup service did not return a setup snapshot. Choose Try Again to reconnect and reload it.",
       isLoading: false
     )
   case .fatal:
     return MissionSetupRecoveryPresentation(
       title: "Runtime & Providers need recovery",
-      detail: "The local setup service could not load setup state. Restart the local Loom service, then choose Try Again.",
+      detail: "The local setup service could not load setup state. Restart the local \(LocalProductCopy.productName) service, then choose Try Again.",
       isLoading: false
     )
   case .ready:
@@ -472,7 +472,7 @@ private struct ProviderCredentialSheet: View {
           .fixedSize(horizontal: false, vertical: true)
         } else if current.status == "recovery_required" {
           Text(
-            "Loom could not open the encrypted credential record. Restart Loom, then review diagnostics before replacing the key."
+            "\(LocalProductCopy.productName) could not open the encrypted credential record. Restart \(LocalProductCopy.productName), then review diagnostics before replacing the key."
           )
           .font(.callout)
           .foregroundStyle(.secondary)
@@ -4007,7 +4007,7 @@ public struct MissionWorkbench: View {
         "dispatch_view_conflict", "dispatch_identity_unavailable",
         "dispatch_validation", "dispatch_context_validation",
         "dispatch_incomplete", "flight_conflict", "parent_continuation":
-        return "Loom could not admit this Team run at \(stage.replacingOccurrences(of: "_", with: " ")). Open Missions to inspect the current Attempt, then retry."
+        return "\(LocalProductCopy.productName) could not admit this Team run at \(stage.replacingOccurrences(of: "_", with: " ")). Open Missions to inspect the current Attempt, then retry."
       default:
         return "The Mission state changed at \(stage.replacingOccurrences(of: "_", with: " ")). Review preflight, then retry."
       }
@@ -4018,7 +4018,7 @@ public struct MissionWorkbench: View {
     case "conflict":
       return "The Mission state changed (for example this Team is already running). Review preflight, then retry."
     case "stale_view":
-      return "Loom's view changed. Review preflight again, then retry."
+      return "\(LocalProductCopy.productName)'s view changed. Review preflight again, then retry."
     case "stale_generation":
       return "The Mission plan moved on. Review preflight again, then retry."
     case "state_unavailable":
@@ -4030,9 +4030,9 @@ public struct MissionWorkbench: View {
     case "preflight_required":
       return "Review preflight before starting the Mission."
     case "projection_visibility_failed":
-      return "The Mission started, but Loom could not yet show it. Open Missions in a moment."
+      return "The Mission started, but \(LocalProductCopy.productName) could not yet show it. Open Missions in a moment."
     case "invalid_response":
-      return "Loom received an invalid execution response. Retry, or open Missions to inspect state."
+      return "\(LocalProductCopy.productName) received an invalid execution response. Retry, or open Missions to inspect state."
     default:
       return "Mission could not proceed: \(reason)"
     }
@@ -7804,7 +7804,7 @@ func sideTaskStatusLabelText(_ raw: String) -> String {
   case "proposal_required":
     return "Review the proposal before creating the side task."
   case "invalid_request", "invalid_response":
-    return "Loom rejected the side task request. Review the fields and try again."
+    return "\(LocalProductCopy.productName) rejected the side task request. Review the fields and try again."
   case "state_unavailable", "unavailable":
     return "Side tasks are unavailable right now. Try again."
   case "conflict", "stale_view", "stale_generation":
