@@ -794,6 +794,32 @@ final class LoomGraphiteViewTests: XCTestCase {
         XCTAssertFalse(source.contains("Context transfer mode"))
     }
 
+    func testConversationRouteDisclosureUsesProductName() throws {
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/LoomLocalAppUI/LoomWorkspaceShell.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+        let sheetStart = try XCTUnwrap(source.range(of: "struct ConversationRouteTransitionSheet: View"))
+        let sheet = source[sheetStart.upperBound...]
+        let bodyEnd = try XCTUnwrap(sheet.range(of: "private func routeRow("))
+        let body = String(sheet[..<bodyEnd.lowerBound])
+        let cleanDetail = #""Share only \(LocalProductCopy.productName) policy, Agent identity, and your next message.""#
+        let receipt = #""\(LocalProductCopy.productName) applies account disclosure policy and records a Disclosure receipt. Omitted context remains visible after dispatch.""#
+
+        XCTAssertNotNil(body.range(
+            of: #"contextModeOption\(\s*\.startClean,\s*title:\s*"Start clean",\s*detail:\s*"#
+                + NSRegularExpression.escapedPattern(for: cleanDetail) + #"\s*\)"#,
+            options: .regularExpression
+        ), "The Start clean detail must identify the product without changing what it shares.")
+        XCTAssertNotNil(body.range(
+            of: #"Label\(\s*"# + NSRegularExpression.escapedPattern(for: receipt)
+                + #",\s*systemImage:\s*"checkmark\.shield"\s*\)"#,
+            options: .regularExpression
+        ), "The disclosure receipt explanation must identify the product without changing its meaning.")
+    }
+
     func testConversationRouteTransitionSheetRendersAcrossAppearances() throws {
         let source = try JSONDecoder().decode(
             LocalProductConversationProfile.self,

@@ -260,3 +260,11 @@ Q12整项完成依据见[TASKS验收矩阵](TASKS.md#q12让诊断可理解可操
 既有OpenAI兼容及Anthropic用例加强品牌和分类断言；`TestConversationProfileRouterShowsBrandedInvalidResponse`经真实客户端、内存HTTP、Router与临时聊天API核验回复和Attempt（含HTTP200、事件号与非重试），同时检查API JSON和临时聊天存储无虚构原文/凭证。先在未改生产时观察四个场景因旧品牌失败，最小修复后同回归通过。`verify-startup.sh`只追加这一个测试选择，本地普通/race各626条，Sandbox各107条，无跳过；格式、锁文件和工作流范围检查通过。未调用真实Provider或验证安装后GUI；已验收固定句不再重复开发。
 
 余项核验：新绑定校验已拒绝不支持的适配器，旧提示属于兼容性防御路径，未现场复现。Mission主/回退预检节点分别直接显示`blockReason`、`fallbackBlockReason`，Swift节点没有独立`blockCode`，原Go预检参与摘要。若修复，在展示层精确映射已知固定旧句，保留未知文本、原字段和审批；不修改后端理由或重算摘要。诊断导出的`loom-diagnostics.json`是保存面板建议名，与Vault建议名均未改动。其余分类见[TASKS](TASKS.md#q06统一用户可见品牌)，没有顺带实现或实测安装后菜单。
+
+### 对话路由披露说明只改产品名（2026-11-05）
+
+验收更新：4bb61a4完整差异经再次及独立只读复核无阻断，按授权保留历史合main。[分支CI42030392545](https://github.com/ggggggtm/ZoriDesk/actions/runs/42030392545)准确对应4bb61a4；原始日志中Go普通/race各107条Sandbox、626条启动/Provider，macOS编译及58项XCTest均通过，无跳过，三项路由测试逐项通过。合并提交CI独立核验，生产源码、测试和脚本与已审分支一致。
+
+`ConversationRouteTransitionSheet`接收待确认的路由变更，默认选「Summary only」。只有存在已冻结的源执行绑定，并且没有信任边界变更或用户已确认这些变更，`conversationRouteTransitionConfirmationEnabled`才允许确认。确认仍把所选上下文模式和确认状态交给`LocalProductStore.confirmConversationRouteTransition`，成功才关闭弹窗。`fix/route-disclosure-branding`只在「Start clean」详情和盾牌图标旁的回执说明引用`LocalProductCopy.productName`，不改变共享范围、凭证隔离、确认或回执逻辑；整个生产文件对照main b70bb2b除这两处外逐字相同。
+
+交付时用Foundation运行同一源码回归的两条断言，旧文案0/2、新文案2/2；本地应用构建、Go普通/race及语法检查通过。`verify-startup-ui.sh`保留原55项，追加文案、离屏渲染与确认门槛三项，正式XCTest由macOS CI执行。未做安装后GUI、实际路由派发或真实模型E2E。本切片不再待审，Q06整体仍进行中；本轮仅核实[TASKS余项](TASKS.md#q06统一用户可见品牌)，未改其他生产路径。

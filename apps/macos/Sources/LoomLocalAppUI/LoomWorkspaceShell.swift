@@ -417,12 +417,12 @@ struct ConversationRouteTransitionSheet: View {
                         contextModeOption(
                             .startClean,
                             title: "Start clean",
-                            detail: "Share only Loom policy, Agent identity, and your next message."
+                            detail: "Share only \(LocalProductCopy.productName) policy, Agent identity, and your next message."
                         )
                     }
 
                     Label(
-                        "Loom applies account disclosure policy and records a Disclosure receipt. Omitted context remains visible after dispatch.",
+                        "\(LocalProductCopy.productName) applies account disclosure policy and records a Disclosure receipt. Omitted context remains visible after dispatch.",
                         systemImage: "checkmark.shield"
                     )
                     .font(.caption)
