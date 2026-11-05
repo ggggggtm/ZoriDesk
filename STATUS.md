@@ -17,8 +17,8 @@
 | 公开仓库初始化 | 已完成；2026-11-02通过GitHub原生操作脱离Fork网络，地址/ID、12分支SHA及320个可达提交未变，必要来源与许可保留 |
 | 项目介绍 | 已发布 README，提交 510fdc956d74e533eb6b43551e1fffc3d10d24ef |
 | 运行时代码 | Provider凭证回显修复dcc3aa6经再次完整及独立复核，按维护者授权保留历史合入main；Q12按下方既定有界验收关闭，不代表全应用安全审计完成 |
-| 构建、测试、端到端验证 | Provider文案分支1b49591的CI42022223574已通过：Go普通/race启动各626条、Sandbox各107条，macOS编译及55项XCTest，无跳过。合并提交CI独立核验；本地结果为同一源码的既有证据。完整GUI、真实恢复、模型E2E及全仓未验证 |
-| 应用与服务内部名称 | 窗口/侧栏/聊天、六处连接、61条桌面故障/恢复及Provider无效响应固定文案已验收；1b49591经再次复核后按授权保留历史合main。Q06仍in_progress，预检、治理、安全警告、Vault/诊断导出展示及包显示名仍有余项，兼容标识保留 |
+| 构建、测试、端到端验证 | main b70bb2b的[合并CI42028281034](https://github.com/ggggggtm/ZoriDesk/actions/runs/42028281034)通过：Go普通/race启动各626条、Sandbox各107条，macOS编译及55项XCTest，无跳过。对话披露分支的本地构建与Go普通/race通过，58项XCTest待该分支CI实跑。完整GUI、真实恢复、模型E2E及全仓未验证 |
+| 应用与服务内部名称 | 窗口/侧栏/聊天、六处连接、61条桌面故障/恢复及Provider无效响应固定文案已验收。对话路由两条披露文案仅在`fix/route-disclosure-branding`待审；Q06仍in_progress，兼容标识保留 |
 | 本地开发与提交环境 | 已建立独立 checkout；SSH 认证到正确所有者，仓库级个人提交身份已配置；Q00 记录已真实推送并核对远端 SHA |
 | Docker / Kubernetes 后端 | 后续规划，不能写成已交付能力 |
 | 发布版本 | 尚未发布 ZoriDesk 版本 |
@@ -34,7 +34,7 @@
 ## 下一步
 
 1. Q00、Q03 经复核并按维护者明确授权合入 main，状态 done；不重复初始化或创建模板。此授权仅针对这两个任务，不改变以后定时维护的分支审查规则。
-2. Q12保持done；独立核验本次合并CI。下一小切片可优先处理常用的对话路由披露说明，仅改展示文字，保留披露规则。远程工具的兼容性预检、安全警告、Vault/诊断导出及包显示名另分批；不重复`invalid_response`、61条桌面故障/恢复或已验收界面，不提前Q07/Q08迁移，不自动合main。
+2. Q12保持done；先核验对话路由分支CI并等待审查，不在main重复修改两条披露文案。其余Q06按[TASKS](TASKS.md#q06统一用户可见品牌)分批处理，不提前Q07/Q08迁移，不自动合main。
 3. Q04 随代码和测试同步补充真实路径与关键函数，不阻塞 Q05/Q09；品牌与兼容性任务后置，原有验收、安全边界和分支审查规则保持不变。
 4. 执行前检查实际分支、未提交改动和待审查工作；有未完成任务先收尾，不机械开始新任务。
 
@@ -372,6 +372,11 @@ git diff --exit-code -- go.mod go.sum
 - `fix/provider-response-branding`基于main 01269c2；只替换`conversationFailureUserMessage`在`invalid_response`分支的固定产品名。后端的新回复和失败详情使用ZoriDesk，分类、阶段、HTTP/Provider码、事件号、重试字段和凭证处理不变；不改Swift、安全消息传递、历史会话或预检摘要。
 - 先补回归：OpenAI兼容一例、Anthropic两子例及真实路由/临时聊天API一例在旧品牌上失败，修复后均通过。虚构HTTP 200空内容仍拒绝且不重试；聊天回复与Attempt详情用同一安全句，API和临时存储不含原始响应标记或假凭证。没有外网Provider、真实账号或模型调用。
 - 本地Go启动/Provider普通与race各626条、Sandbox各107条通过，无跳过；原CI选择全保留，只追加一个跨组件回归用例，不改工作流。此切片不再待审，Q06整体不标done；测试夹具不是安装版GUI或真实模型E2E。
+
+## Q06 对话路由披露展示（2026-11-05）
+
+- `fix/route-disclosure-branding`基于main b70bb2b。`ConversationRouteTransitionSheet`的「Start clean」说明和披露回执提示改用`LocalProductCopy.productName`；除此之外生产源码逐字不变。上下文选项、信任边界确认、权限、审批和回执规则不变。
+- 先补一项源码回归；相同两条断言在旧源码0/2通过、修复后2/2通过。Swift应用构建通过；本地Sandbox普通/race各107条、启动/Provider各626条，无跳过。保留原55项XCTest，新增品牌回归并纳入既有离屏渲染和信任边界确认测试，共58项。CLT缺XCTest，正式执行须核验对应分支CI；未做安装后GUI或真实模型调用。此切片待审，不合main。
 
 ## 状态维护约定
 

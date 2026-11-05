@@ -58,6 +58,9 @@ chat_state_filter=$(IFS='|'; echo "${chat_state_tests[*]}")
 chat_view_tests=(
   testChatBrandWiringPreservesComposerAndCopyInteraction
   testWorkspaceShellConsumesAgentTeamBuilderSession
+  testConversationRouteDisclosureUsesProductName
+  testConversationRouteTransitionSheetRendersAcrossAppearances
+  testConversationRouteTransitionTrustBoundaryAcknowledgementGate
 )
 chat_view_filter=$(IFS='|'; echo "${chat_view_tests[*]}")
 connection_state_tests=(
