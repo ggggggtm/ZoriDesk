@@ -636,7 +636,7 @@ func conversationFailureUserMessage(code string) string {
 	case "provider_unavailable":
 		return "Provider service is temporarily unavailable."
 	case "invalid_response":
-		return "Provider returned a response Loom could not safely accept."
+		return "Provider returned a response ZoriDesk could not safely accept."
 	case "timeout":
 		return "Provider connection timed out."
 	default:
