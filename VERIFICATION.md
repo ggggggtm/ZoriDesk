@@ -238,3 +238,11 @@ Q12整项完成依据见[TASKS验收矩阵](TASKS.md#q12让诊断可理解可操
 本地旧实际Core探针RED退出1，修复后同探针在12个nil/保留快照状态场景GREEN，另Mission标签常量检查通过；修改后应用构建通过。没有实例化Store、调用真实刷新/恢复或连接服务，不能称网络恢复或安装后GUI E2E通过；CLT缺XCTest，正式43项及原Go普通/race交由对应提交CI实际执行。当前待审、不合main，Q06仍有其他文案未完成，不重复窗口/侧栏/聊天或更改Q12逻辑。
 
 本次剩余核验仅做源码与生产调用链检查：Mission设置恢复提示、执行失败与chatFailure等故障建议；路由披露/权限/Roundtable说明；toolShapedWarning中的品牌词；Vault页面/导出建议文件名前缀；Info.plist两个显示名称仍未统一，见[TASKS的Q06范围](TASKS.md#q06统一用户可见品牌)。这不是安装后界面实测；工具警告必须保留“未执行”，Vault扩展名/格式及服务路径等兼容标识不在机械替换范围。没有顺带实现下一切片，Q06不能标done。
+
+### 故障与恢复提示只改显示名（2026-11-05）
+
+`fix/failure-recovery-branding`基于main 513af61。Mission的`missionRuntimeRecoveryReason`、`missionSetupRecoveryPresentation`和执行失败标签按原状态输出；`runtimeAvailabilityDetail`按原可用性输出；`LocalProductStore`在原失败映射中只替换固定提示内的产品词。对照基线，3份源码仅61行中73处品牌词变为`LocalProductCopy.productName`，其余字节不变。聊天`chatFailureDetail`仍优先显示后端的非空安全消息，原样附HTTP状态、Provider码和重试时间；Agent/工具必须按既有确认和候选校验流程处理。后端生成的文案不在本次范围，收到的消息不做全局替换。
+
+实际旧Core/UI探针10项品牌断言失败、7项行为对照通过；新应用编译成功后，同探针17项全过。探针通过假客户端与临时会话文件验证Mission/Runtime/侧任务、聊天迁移失败与安全消息/重试字段、Agent恢复超时，未访问真实凭证或服务。新增4项XCTest覆盖设置/预检、账户/费率/工具失败、聊天安全消息及Agent恢复确认；另纳入8项既有文案与保护回归。`verify-startup-ui.sh`保留原43项、逐项核对全部55项，不允许跳过或空选。本机CLT无XCTest，探针与源码语法检查不是正式XCTest。
+
+`verify-sandbox.sh`和`verify-startup.sh`本地普通/race分别各107、625条记录均通过无跳过，Go源码、工作流与锁文件不变；实际分支CI在推送后核验。此次不是完整GUI、实际恢复执行或模型E2E验收，分支待审、不合main，Q06剩余见[TASKS](TASKS.md#q06统一用户可见品牌)。

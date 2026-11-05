@@ -2676,7 +2676,7 @@ public final class LocalProductStore: ObservableObject {
 		LocalProductChatOperationFailure(
 			code: .humanRequired, stage: .toolRecovery,
 			recoverable: false, incidentID: "", title: "Tool recovery review required",
-			detail: "Refresh the exact ToolCall candidate and choose one of its available governed actions. Loom will not rerun the original call."
+			detail: "Refresh the exact ToolCall candidate and choose one of its available governed actions. \(LocalProductCopy.productName) will not rerun the original call."
 		)
 	}
 
@@ -2718,7 +2718,7 @@ public final class LocalProductStore: ObservableObject {
 		default:
 			presentation = (
 				"Tool recovery unavailable",
-				"Loom could not record this decision. Refresh the candidate and review diagnostics."
+				"\(LocalProductCopy.productName) could not record this decision. Refresh the candidate and review diagnostics."
 			)
 		}
 		return LocalProductChatOperationFailure(
@@ -2791,7 +2791,7 @@ public final class LocalProductStore: ObservableObject {
     case .timeout:
       presentation = (
         "Recovery timed out",
-        "Loom could not confirm the recovery outcome. Refresh candidates before retrying."
+        "\(LocalProductCopy.productName) could not confirm the recovery outcome. Refresh candidates before retrying."
       )
     case .invalidRequest:
       presentation = (
@@ -2801,7 +2801,7 @@ public final class LocalProductStore: ObservableObject {
     default:
       presentation = (
         "Recovery unavailable",
-        "Loom could not complete this Agent recovery action. Refresh and review diagnostics."
+        "\(LocalProductCopy.productName) could not complete this Agent recovery action. Refresh and review diagnostics."
       )
     }
     return LocalProductChatOperationFailure(
@@ -4782,22 +4782,22 @@ public final class LocalProductStore: ObservableObject {
     case (_, .migrationRead):
       presentation = (
         "Conversation migration blocked",
-        "Loom could not safely read the previous conversation store. Correct its ownership or permissions, then reopen Loom."
+        "\(LocalProductCopy.productName) could not safely read the previous conversation store. Correct its ownership or permissions, then reopen \(LocalProductCopy.productName)."
       )
     case (_, .migrationCommit):
       presentation = (
         "Conversation migration incomplete",
-        "Loom preserved the previous conversation store because the encrypted commit did not finish. Correct the storage issue, then reopen Loom."
+        "\(LocalProductCopy.productName) preserved the previous conversation store because the encrypted commit did not finish. Correct the storage issue, then reopen \(LocalProductCopy.productName)."
       )
     case (_, .migrationCleanup):
       presentation = (
         "Conversation migration cleanup required",
-        "Loom committed the encrypted conversation but could not safely remove the previous plaintext store. Correct its permissions, then reopen Loom."
+        "\(LocalProductCopy.productName) committed the encrypted conversation but could not safely remove the previous plaintext store. Correct its permissions, then reopen \(LocalProductCopy.productName)."
       )
     case (.conflict, .conversationDispatch):
       presentation = (
         "Conversation route changed",
-        "Loom preserved this conversation and your draft. Retry to review the new Segment and choose what context to share."
+        "\(LocalProductCopy.productName) preserved this conversation and your draft. Retry to review the new Segment and choose what context to share."
       )
     case (.invalidRequest, .inputAdmission):
       presentation = (
@@ -4812,37 +4812,37 @@ public final class LocalProductStore: ObservableObject {
     case (.conversationUnavailable, .conversationDispatch):
       presentation = (
         "Conversation could not start",
-        "Loom could not dispatch this message with the selected Profile. Open Runtime & Providers to check the runtime and the model's Provider Account, then retry."
+        "\(LocalProductCopy.productName) could not dispatch this message with the selected Profile. Open Runtime & Providers to check the runtime and the model's Provider Account, then retry."
       )
     case (.conversationLimit, _):
       presentation = (
         "Conversation limit reached",
-        "Loom keeps a bounded set of conversations (1,024). Delete or archive older conversations, then start a new one. Your existing conversations are preserved."
+        "\(LocalProductCopy.productName) keeps a bounded set of conversations (1,024). Delete or archive older conversations, then start a new one. Your existing conversations are preserved."
       )
     case (.stateUnavailable, .vaultKeyLoad):
       presentation = (
         "Credential Vault locked",
-        "Loom could not load the Credential Vault key for this conversation. Unlock the vault, then retry. Your draft is preserved."
+        "\(LocalProductCopy.productName) could not load the Credential Vault key for this conversation. Unlock the vault, then retry. Your draft is preserved."
       )
     case (.stateUnavailable, .vaultOpen):
       presentation = (
         "Credential Vault unavailable",
-        "Loom could not open the encrypted Credential Vault. Check its local storage permissions, then reopen Loom and retry."
+        "\(LocalProductCopy.productName) could not open the encrypted Credential Vault. Check its local storage permissions, then reopen \(LocalProductCopy.productName) and retry."
       )
     case (.stateUnavailable, .vaultEncrypt):
       presentation = (
         "Conversation context could not be secured",
-        "Loom could not encrypt this conversation's context capsule with the Credential Vault. Unlock the vault or re-verify the selected Provider Account credential, then retry. Your draft is preserved."
+        "\(LocalProductCopy.productName) could not encrypt this conversation's context capsule with the Credential Vault. Unlock the vault or re-verify the selected Provider Account credential, then retry. Your draft is preserved."
       )
     case (.stateUnavailable, .vaultCommit):
       presentation = (
         "Conversation context could not be committed",
-        "Loom could not safely commit the encrypted conversation context. Try again; if the issue persists, review the diagnostics."
+        "\(LocalProductCopy.productName) could not safely commit the encrypted conversation context. Try again; if the issue persists, review the diagnostics."
       )
     case (.providerUnavailable, .providerConnect):
       presentation = (
         "Conversation Provider could not start",
-        "Loom could not start the selected conversation runtime (for example OpenCode). Open Runtime & Providers, verify the runtime and the selected model's Provider credential, then retry."
+        "\(LocalProductCopy.productName) could not start the selected conversation runtime (for example OpenCode). Open Runtime & Providers, verify the runtime and the selected model's Provider credential, then retry."
       )
     case (.timeout, _):
       presentation = (
@@ -4852,7 +4852,7 @@ public final class LocalProductStore: ObservableObject {
     case (.providerAuth, .providerConnect):
       presentation = (
         "Model Provider credential required",
-        "The selected model belongs to a Provider that has no verified Loom account. Open Provider Account to configure and verify it, or select a different model."
+        "The selected model belongs to a Provider that has no verified \(LocalProductCopy.productName) account. Open Provider Account to configure and verify it, or select a different model."
       )
     case (.providerAuth, _):
       presentation = (
@@ -4902,17 +4902,17 @@ public final class LocalProductStore: ObservableObject {
     case (.invalidResponse, _):
       presentation = (
         "Invalid Provider response",
-        "The selected Provider returned a response Loom could not safely accept."
+        "The selected Provider returned a response \(LocalProductCopy.productName) could not safely accept."
       )
     case (_, .udsTransport):
       presentation = (
         "Local service unavailable",
-        "Loom could not reach its bundled service. Reopen Loom or retry."
+        "\(LocalProductCopy.productName) could not reach its bundled service. Reopen \(LocalProductCopy.productName) or retry."
       )
     default:
       presentation = (
         "Conversation unavailable",
-        "Loom could not dispatch this message with the selected Profile. Your draft is preserved."
+        "\(LocalProductCopy.productName) could not dispatch this message with the selected Profile. Your draft is preserved."
       )
     }
     return LocalProductChatOperationFailure(
@@ -6210,14 +6210,14 @@ public final class LocalProductStore: ObservableObject {
           "Account governance is temporarily unavailable. Try again\(incident)"
       default:
         providerPolicyOperationDetail[providerAccountID] =
-          "Loom could not save these account limits\(incident)"
+          "\(LocalProductCopy.productName) could not save these account limits\(incident)"
       }
       return false
     } catch {
       providerPolicyOperationDetail[providerAccountID] =
         error as? LocalProductClientError == .invalidResponse
           ? "The local service returned inconsistent account limits. Reload and try again"
-          : "Loom could not save these account limits"
+          : "\(LocalProductCopy.productName) could not save these account limits"
       return false
     }
   }
@@ -6291,14 +6291,14 @@ public final class LocalProductStore: ObservableObject {
           "Cost governance is temporarily unavailable. Try again\(incident)"
       default:
         providerRateCardOperationDetail[operationKey] =
-          "Loom could not save this rate card\(incident)"
+          "\(LocalProductCopy.productName) could not save this rate card\(incident)"
       }
       return false
     } catch {
       providerRateCardOperationDetail[operationKey] =
         error as? LocalProductClientError == .invalidResponse
           ? "The local service returned an inconsistent rate card. Reload and try again"
-          : "Loom could not save this rate card"
+          : "\(LocalProductCopy.productName) could not save this rate card"
       return false
     }
   }
@@ -6430,7 +6430,7 @@ public final class LocalProductStore: ObservableObject {
     guard let remote = error as? LocalIPCRemoteError else {
       return error as? LocalProductClientError == .invalidResponse
         ? "The local service returned inconsistent remote tool state. Reload and try again"
-        : "Loom could not \(action) this remote tool"
+        : "\(LocalProductCopy.productName) could not \(action) this remote tool"
     }
     let incident = remote.incidentID.map {
       $0.isEmpty ? "" : " · Incident \($0)"
@@ -6445,7 +6445,7 @@ public final class LocalProductStore: ObservableObject {
     case .stateUnavailable, .busy, .timeout:
       return "Remote tool governance is temporarily unavailable. Try again\(incident)"
     default:
-      return "Loom could not \(action) this remote tool\(incident)"
+      return "\(LocalProductCopy.productName) could not \(action) this remote tool\(incident)"
     }
   }
 
@@ -7062,29 +7062,29 @@ public final class LocalProductStore: ObservableObject {
       let stagedDetail: String? =
         switch remote.stage {
         case .inputAdmission:
-          "Loom rejected the credential input before sending it. Remove unexpected characters and try again."
+          "\(LocalProductCopy.productName) rejected the credential input before sending it. Remove unexpected characters and try again."
         case .udsTransport:
-          "The Loom App could not complete the secure request to its bundled service. Reopen Loom and try again."
+          "The \(LocalProductCopy.productName) App could not complete the secure request to its bundled service. Reopen \(LocalProductCopy.productName) and try again."
         case .daemonAdmission:
           "The bundled service rejected the credential request. Review the input and try again."
         case .helperValidation:
-          "Loom rejected the local credential request before Keychain access. Reopen Loom and try again."
+          "\(LocalProductCopy.productName) rejected the local credential request before Keychain access. Reopen \(LocalProductCopy.productName) and try again."
         case .helperStart:
-          "The bundled credential helper could not start. Reinstall Loom, then try again."
+          "The bundled credential helper could not start. Reinstall \(LocalProductCopy.productName), then try again."
         case .helperAuthorization:
-          "macOS could not verify Loom's bundled credential helper. Reinstall or reopen Loom, then try again."
+          "macOS could not verify \(LocalProductCopy.productName)'s bundled credential helper. Reinstall or reopen \(LocalProductCopy.productName), then try again."
         case .helperRequest, .helperResponse, .helperExit:
-          "The secure transfer to macOS Keychain did not complete. Reopen Loom and try again."
+          "The secure transfer to macOS Keychain did not complete. Reopen \(LocalProductCopy.productName) and try again."
         case .helperTimeout:
-          "The credential helper did not respond in time. Reopen Loom and try again."
+          "The credential helper did not respond in time. Reopen \(LocalProductCopy.productName) and try again."
         case .keychainAccess:
           "macOS Keychain denied or could not complete this operation. Check Keychain access and try again."
         case .vaultKeyLoad:
-          "Loom could not unlock its local Credential Vault. Restart Loom and review diagnostics."
+          "\(LocalProductCopy.productName) could not unlock its local Credential Vault. Restart \(LocalProductCopy.productName) and review diagnostics."
         case .vaultOpen:
-          "Loom could not open the encrypted Credential Vault. Review its local storage permissions."
+          "\(LocalProductCopy.productName) could not open the encrypted Credential Vault. Review its local storage permissions."
         case .vaultEncrypt, .vaultCommit:
-          "Loom could not safely commit this key to the Credential Vault. Try again."
+          "\(LocalProductCopy.productName) could not safely commit this key to the Credential Vault. Try again."
         case .vaultDecrypt, .vaultAADValidation:
           "The encrypted credential did not match this Provider Account and revision. Re-enter the key."
         case .vaultRotation:
@@ -7094,15 +7094,15 @@ public final class LocalProductStore: ObservableObject {
         case .vaultExport:
           "Credential Vault export did not complete. Choose a new file and retry."
         case .credentialLeaseIssue, .credentialLeaseExpire, .credentialLeaseRevoke:
-          "Loom could not issue the exact short-lived credential lease. Re-enter or verify this account's key."
+          "\(LocalProductCopy.productName) could not issue the exact short-lived credential lease. Re-enter or verify this account's key."
         case .migrationRead, .migrationCommit, .migrationCleanup:
           "Credential migration did not complete. The existing credential was not removed; retry or re-enter the key."
         case .metadataCommit:
-          "The key was rolled back because Loom could not commit its non-secret configuration. Try again."
+          "The key was rolled back because \(LocalProductCopy.productName) could not commit its non-secret configuration. Try again."
         case .projectionRefresh:
-          "The key was stored, but Loom could not refresh the visible configuration. Reopen Loom and try again."
+          "The key was stored, but \(LocalProductCopy.productName) could not refresh the visible configuration. Reopen \(LocalProductCopy.productName) and try again."
         case .providerDNS, .providerTLS, .providerConnect, .providerHTTP:
-          "Loom could not reach the provider securely. Check the connection and try again."
+          "\(LocalProductCopy.productName) could not reach the provider securely. Check the connection and try again."
         case .providerAuth:
           "The provider did not accept this credential. Check the key and selected provider."
         case .providerRateLimit:
@@ -7116,7 +7116,7 @@ public final class LocalProductStore: ObservableObject {
         case .agentAttemptDispatch:
           "The Agent Attempt could not be dispatched with its frozen binding. Review the Agent configuration."
         case .agentAttemptReconcile:
-          "The Agent Attempt needs an explicit recovery decision after Loom restarted. Review the Agent diagnostics."
+          "The Agent Attempt needs an explicit recovery decision after \(LocalProductCopy.productName) restarted. Review the Agent diagnostics."
         case .agentInputAdmission:
           "The running Agent could not admit this input. Refresh the Mission and retry its current Attempt."
         case .preflightLease, .viewDrift, .preflightDigest:
@@ -7149,19 +7149,19 @@ public final class LocalProductStore: ObservableObject {
       case .invalidRequest:
         presentation = (
           "Invalid key input",
-          "Remove unexpected characters and try again. Loom trims only spaces, tabs, and line breaks at the beginning or end."
+          "Remove unexpected characters and try again. \(LocalProductCopy.productName) trims only spaces, tabs, and line breaks at the beginning or end."
         )
       case .credentialUnavailable, .credentialRollbackFailed:
         presentation = (
           "Credential Vault unavailable",
           stagedDetail
-            ?? "Loom could not safely complete this Credential Vault operation. Review diagnostics and try again."
+            ?? "\(LocalProductCopy.productName) could not safely complete this Credential Vault operation. Review diagnostics and try again."
         )
       case .denied, .unauthorizedPeer:
         presentation = (
           "Access denied",
           stagedDetail
-            ?? "macOS denied access to the Loom credential helper. Reopen Loom and try again."
+            ?? "macOS denied access to the \(LocalProductCopy.productName) credential helper. Reopen \(LocalProductCopy.productName) and try again."
         )
       case .credentialRejected:
         presentation = (
@@ -7176,7 +7176,7 @@ public final class LocalProductStore: ObservableObject {
       default:
         presentation = (
           "Connection failed",
-          "Loom could not complete this credential operation. Try again."
+          "\(LocalProductCopy.productName) could not complete this credential operation. Try again."
         )
       }
       providerOperationStage[operationKey] = providerStageDisplayName(remote.stage)
@@ -7187,22 +7187,22 @@ public final class LocalProductStore: ObservableObject {
       case .invalidRequest:
         presentation = (
           "Invalid key input",
-          "Remove unexpected characters and try again. Loom trims only spaces, tabs, and line breaks at the beginning or end."
+          "Remove unexpected characters and try again. \(LocalProductCopy.productName) trims only spaces, tabs, and line breaks at the beginning or end."
         )
       case .timeout:
         presentation = ("Timed out", "The local service did not respond in time. Try again.")
       case .invalidSocket, .unavailable:
-        presentation = ("Local service unavailable", "Reopen Loom and try again.")
+        presentation = ("Local service unavailable", "Reopen \(LocalProductCopy.productName) and try again.")
       case .invalidResponse:
         presentation = (
-          "Invalid service response", "Loom received an unexpected response. Try again."
+          "Invalid service response", "\(LocalProductCopy.productName) received an unexpected response. Try again."
         )
       case .notFound:
         presentation = ("Credential not found", "Reconnect this provider with its API key.")
       }
     } else {
       presentation = (
-        "Connection failed", "Loom could not complete this credential operation. Try again."
+        "Connection failed", "\(LocalProductCopy.productName) could not complete this credential operation. Try again."
       )
     }
     providerOperationStatus[operationKey] = presentation.0

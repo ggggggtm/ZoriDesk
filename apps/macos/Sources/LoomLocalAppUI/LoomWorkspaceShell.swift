@@ -3918,8 +3918,8 @@ func runtimeAvailabilityDetail(
         return "\(count) model\(count == 1 ? "" : "s") · \(normalizedStatus)"
     }
     return normalizedStatus.isEmpty
-        ? "Unavailable · reopen Loom after fixing the executable"
-        : "\(normalizedStatus) · reopen Loom after fixing the executable"
+        ? "Unavailable · reopen \(LocalProductCopy.productName) after fixing the executable"
+        : "\(normalizedStatus) · reopen \(LocalProductCopy.productName) after fixing the executable"
 }
 
 func runtimeAvailabilityAccessibilityLabel(

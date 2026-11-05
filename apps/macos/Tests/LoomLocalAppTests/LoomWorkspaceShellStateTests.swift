@@ -191,7 +191,9 @@ final class LoomWorkspaceShellStateTests: XCTestCase {
 
     func testSideTaskStatusLabelMapsRawCodesToReadableCopy() {
         XCTAssertEqual(sideTaskStatusLabelText("invalid_request"),
-                       "Loom rejected the side task request. Review the fields and try again.")
+                       "ZoriDesk rejected the side task request. Review the fields and try again.")
+        XCTAssertEqual(sideTaskStatusLabelText("invalid_response"),
+                       "ZoriDesk rejected the side task request. Review the fields and try again.")
         XCTAssertEqual(sideTaskStatusLabelText("state_unavailable"),
                        "Side tasks are unavailable right now. Try again.")
         XCTAssertEqual(sideTaskStatusLabelText("capability_gap"),
@@ -722,7 +724,11 @@ final class LoomWorkspaceShellStateTests: XCTestCase {
                 status: "degraded",
                 ready: false
             ),
-            "degraded · reopen Loom after fixing the executable"
+            "degraded · reopen ZoriDesk after fixing the executable"
+        )
+        XCTAssertEqual(
+            runtimeAvailabilityDetail(modelCount: 0, status: " \n ", ready: false),
+            "Unavailable · reopen ZoriDesk after fixing the executable"
         )
         XCTAssertEqual(
             runtimeAvailabilityAccessibilityLabel(
