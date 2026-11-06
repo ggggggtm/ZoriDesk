@@ -45,6 +45,8 @@ brand_tests=(
   testWorkspaceBrandCopyIdentifiesZoriDesk
   testWorkspaceBrandWiringPreservesCompatibilityIdentifiers
   testWorkspaceBrandHeaderRendersWideAndCompact
+  testRoundtableCreationGuideUsesProductName
+  testRoundtableSupportsDragDropAndSeatRemoval
 )
 brand_filter=$(IFS='|'; echo "${brand_tests[*]}")
 chat_state_tests=(

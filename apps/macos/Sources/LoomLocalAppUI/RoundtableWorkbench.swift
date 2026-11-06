@@ -535,7 +535,7 @@ public struct RoundtableWorkbench: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("New governed handoff")
                 .font(.title3.weight(.semibold))
-            Text("Create a session, then drag two configured Agents into the seats below. Loom walks one bounded message through propose → relay → acknowledge → insert → conclude.")
+            Text("Create a session, then drag two configured Agents into the seats below. \(LocalProductCopy.productName) walks one bounded message through propose → relay → acknowledge → insert → conclude.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

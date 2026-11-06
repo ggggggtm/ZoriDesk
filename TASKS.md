@@ -1,6 +1,6 @@
 # ZoriDesk 维护任务队列
 
-更新日期：2026-11-05。此处列的是可验收的工作，不是按日期凑提交的日历。
+更新日期：2026-11-06。此处列的是可验收的工作，不是按日期凑提交的日历。
 
 ## 执行方式
 
@@ -24,7 +24,7 @@
 | Q03 | 贡献指南与反馈模板 | done | 2026-10-13 按维护者授权复核并合入 main；不改变 Issues 设置 |
 | Q04 | 架构、用户路径与源码导航 | in_progress | VERIFICATION.md 已补 Q05 的验证链路；完整用户路径仍未覆盖 |
 | Q05 | 无真实账号的测试基线与 CI | done | 2026-10-28 按授权复核 0b9e1ff 并合入 main；本地与分支 CI 普通/race 各 55 个事件通过，无跳过；限定 sandbox/testreport 基线 |
-| Q06 | 用户可见品牌统一 | in_progress | 窗口/侧栏/聊天、连接、故障/恢复及Provider无效响应已验收；两条对话披露提示4bb61a4经授权合main，分支CI42030392545通过，合并CI另验；余项见下表 |
+| Q06 | 用户可见品牌统一 | in_progress | 窗口/侧栏/聊天、连接、故障/恢复、Provider无效响应及对话披露已验收；Roundtable创建引导1bcb257经复核合main，分支CI42174092042通过，合并CI另验；余项见下表 |
 | Q07 | 安装与服务标识迁移 | backlog | Q05、Q06；与 Q08 联合设计 |
 | Q08 | 数据路径、凭证与兼容策略 | backlog | Q07/Q08 联合方案先评审 |
 | Q09 | 执行输出限制与回归测试 | done | 2026-10-28 按明确授权复核 b40a0fe 并合入 main；本地与分支 CI 普通/race 各 91 条记录通过无跳过，仅验收 Loopback 有界输出 |
@@ -97,6 +97,8 @@ Q01、Q02 为 2026-10-13 初始化文档交付；只代表维护文档，不代�
 
 ### Q06：统一用户可见品牌
 
+最新验收（2026-11-06）：`fix/roundtable-session-copy`的1bcb257经再次及独立只读复核无阻断，按授权保留历史合main。创建引导只换一处产品名，创建、流转、权限不变。分支CI42174092042准确对应1bcb257，Go普通/race各107条Sandbox、626条启动/Provider，macOS编译和60项XCTest通过、无跳过；合并CI另验。该引导不再待审、不重复实现。
+
 最新验收（2026-11-05）：`fix/route-disclosure-branding`的4bb61a4经再次及独立只读复核无阻断，按授权保留历史合main。`ConversationRouteTransitionSheet`只换「Start clean」详情和披露回执说明两处产品名，披露、权限及审批不变。分支CI42030392545对应准确SHA，Go普通/race各107条Sandbox、626条启动/Provider及macOS编译、58项XCTest均通过，无跳过；合并CI单独核验。两条文案不再待审，不重复实现。
 
 最新验收（2026-11-05）：`fix/provider-response-branding`的1b49591经再次完整及独立只读复核无阻断，按授权保留历史合main。仅改`conversationFailureUserMessage`的`invalid_response`固定产品词；四个旧版品牌失败场景修复后均通过，分类、安全与非重试保持。对应分支CI42022223574与原始日志复核：启动/Provider普通/race各626条、Sandbox各107条、macOS编译及55项XCTest通过无跳过，新增跨组件用例在普通/race均实际运行。合并CI独立核验；不重复本切片或顺带实施余项。
@@ -113,12 +115,11 @@ Q01、Q02 为 2026-10-13 初始化文档交付；只代表维护文档，不代�
 | --- | --- |
 | 远程工具兼容性预检 | `invalid_response`固定词已验收，不重复。新绑定校验已拒绝不支持的适配器，旧名残留在兼容性防御路径，不是新配置必现。Mission主/回退节点直接展示`block_reason`/`fallback_block_reason`，Swift没有独立`blockCode`。后续只在展示层精确映射已知固定理由，保留其他文本、原字段、摘要与审批 |
 | 权限与治理说明 | Mission的账号策略、端点审批、工具恢复确认、权限模式、子运行及备用路由审批说明仍有旧词；与已改的对话路由披露弹窗不同。只读Review Gate和备用路由还会显示固定请求者名“Loom authority”/“Loom”，应区分展示与真实请求者数据，保留审批、执行规则和治理标识 |
-| Roundtable创建引导 | `RoundtableWorkbench.createSessionForm`仍显示旧品牌。可独立统一一句引导，不改会话创建、消息流转或权限 |
 | 工具形态安全警告正文 | Swift `toolShapedWarning`可进入消息、读屏与转录；Go API也会提前把工具形态回复替换为固定旧警告，单改Swift常量不能覆盖这条路径。后续核对新回复和旧记录的显示边界，保留“未执行”和原过滤，不重写历史消息 |
-| Vault与诊断导出展示 | `MissionWorkbench.swift`的Vault标题、导入按钮/说明/帮助、Vault导出的`Loom-Credential-Vault.loomvault`和诊断导出的`loom-diagnostics.json`仍是旧建议名。只评估保存面板的前缀与展示，保留`.loomvault`类型、JSON格式、诊断过滤和Vault存储namespace，不重复Q12 |
+| Vault与诊断导出展示 | `MissionWorkbench.swift`的Vault标题、导入按钮/说明/帮助仍有旧词。Vault和诊断的两个`NSSavePanel`仍预填`Loom-Credential-Vault.loomvault`、`loom-diagnostics.json`，用户选择后才取目标URL；可独立改建议名，保留类型、用户所选目标、导出内容/过滤及Vault存储，不重复Q12 |
 | 应用包显示名称 | `Resources/Info.plist`的CFBundleDisplayName/CFBundleName仍Loom，构建脚本复制入包，包测试也断言原CFBundleName；后续同步测试并隔离核验两字段，实际安装后菜单未验。不得顺带改bundle ID、可执行文件、安装位置或服务标识 |
 
-不要机械替换协议角色`"loom"`、Harness ID `loom-native`、模块/服务/通知/环境变量、socket/数据库/Vault路径、来源版权或历史证据。`Loom Native`是可见的运行时名，Go的兼容校验也比对该名称；如需统一应先确认仅映射显示，不改运行时记录。`InteractionContinuity.primaryFlow`未发现生产引用，不列为活跃界面遗漏；继承的TUI不并入本次macOS盘点。先核验本次合并CI，后续可优先做独立的Roundtable引导切片；仍用类型/主题新分支、回归与实际CI后待审，不自动合main，不提前Q07/Q08迁移。
+不要机械替换协议角色`"loom"`、Harness ID `loom-native`、模块/服务/通知/环境变量、socket/数据库/Vault路径、来源版权或历史证据。`Loom Native`是可见的运行时名，Go的兼容校验也比对该名称；如需统一应先确认仅映射显示，不改运行时记录。`InteractionContinuity.primaryFlow`未发现生产引用，不列为活跃界面遗漏；继承的TUI不并入本次macOS盘点。先核验本次合并CI，后续可优先处理两个保存面板的建议文件名；仍用类型/主题新分支、回归与实际CI后待审，不自动合main，不提前Q07/Q08迁移。
 
 - 盘点窗口、菜单、设置和错误提示的 Loom 名称，分辨产品文案与必须保留的协议/版权标识。
 - 小批量修改并核对 UI；暂不全局替换模块名、数据库路径和凭证标识。

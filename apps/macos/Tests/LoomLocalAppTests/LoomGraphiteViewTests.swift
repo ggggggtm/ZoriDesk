@@ -519,6 +519,22 @@ final class LoomGraphiteViewTests: XCTestCase {
         XCTAssertLessThan(refreshJoin.lowerBound, recoveryJoin.lowerBound)
     }
 
+    func testRoundtableCreationGuideUsesProductName() throws {
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/LoomLocalAppUI/RoundtableWorkbench.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+        let formStart = try XCTUnwrap(source.range(of: "private var createSessionForm: some View {"))
+        let afterFormStart = source[formStart.upperBound...]
+        let formEnd = try XCTUnwrap(afterFormStart.range(of: "private func openSession()"))
+        let form = afterFormStart[..<formEnd.lowerBound]
+        let guide = #"Text("Create a session, then drag two configured Agents into the seats below. \(LocalProductCopy.productName) walks one bounded message through propose → relay → acknowledge → insert → conclude.")"#
+
+        XCTAssertTrue(form.contains(guide), "The creation guide must use the product name without changing the described handoff steps.")
+    }
+
     func testRoundtableSupportsDragDropAndSeatRemoval() throws {
         let sourceURL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

@@ -1,6 +1,6 @@
 # ZoriDesk 当前状态
 
-更新日期：2026-11-05。本文只记录 ZoriDesk 的事实，不把上游验收记录当作本项目复验结果。
+更新日期：2026-11-06。本文只记录 ZoriDesk 的事实，不把上游验收记录当作本项目复验结果。
 
 ## 项目身份与阅读顺序
 
@@ -17,8 +17,8 @@
 | 公开仓库初始化 | 已完成；2026-11-02通过GitHub原生操作脱离Fork网络，地址/ID、12分支SHA及320个可达提交未变，必要来源与许可保留 |
 | 项目介绍 | 已发布 README，提交 510fdc956d74e533eb6b43551e1fffc3d10d24ef |
 | 运行时代码 | Provider凭证回显修复dcc3aa6经再次完整及独立复核，按维护者授权保留历史合入main；Q12按下方既定有界验收关闭，不代表全应用安全审计完成 |
-| 构建、测试、端到端验证 | 对话披露提交4bb61a4的[分支CI42030392545](https://github.com/ggggggtm/ZoriDesk/actions/runs/42030392545)通过：Go普通/race启动各626条、Sandbox各107条，macOS编译及58项XCTest，无跳过。合并提交CI单独核验。完整GUI、真实恢复、模型E2E及全仓未验证 |
-| 应用与服务内部名称 | 窗口/侧栏/聊天、六处连接、61条桌面故障/恢复和Provider无效响应固定文案已验收；两条对话路由披露提示经复核合入main，不再待审。Q06仍in_progress，兼容标识保留 |
+| 构建、测试、端到端验证 | Roundtable提交1bcb257的[分支CI42174092042](https://github.com/ggggggtm/ZoriDesk/actions/runs/42174092042)通过：Go普通/race启动各626条、Sandbox各107条，macOS编译及60项XCTest，无跳过。合并提交CI单独核验。完整GUI、真实恢复、模型E2E及全仓未验证 |
+| 应用与服务内部名称 | 窗口/侧栏/聊天、连接、故障/恢复、Provider无效响应和两条对话路由披露提示已验收；Roundtable一句创建引导经复核合入main。Q06仍in_progress，兼容标识保留 |
 | 本地开发与提交环境 | 已建立独立 checkout；SSH 认证到正确所有者，仓库级个人提交身份已配置；Q00 记录已真实推送并核对远端 SHA |
 | Docker / Kubernetes 后端 | 后续规划，不能写成已交付能力 |
 | 发布版本 | 尚未发布 ZoriDesk 版本 |
@@ -34,7 +34,7 @@
 ## 下一步
 
 1. Q00、Q03 经复核并按维护者明确授权合入 main，状态 done；不重复初始化或创建模板。此授权仅针对这两个任务，不改变以后定时维护的分支审查规则。
-2. Q12保持done。先核验对话路由合并提交CI；后续Q06按[TASKS](TASKS.md#q06统一用户可见品牌)分批核对余项，不重复两条披露文案或已验收界面，不提前Q07/Q08迁移，不自动合main。
+2. Q12保持done。先核验Roundtable引导的合并CI；后续Q06按[TASKS](TASKS.md#q06统一用户可见品牌)分批处理，不重复本切片或已验收界面，不提前Q07/Q08迁移，不自动合main。
 3. Q04 随代码和测试同步补充真实路径与关键函数，不阻塞 Q05/Q09；品牌与兼容性任务后置，原有验收、安全边界和分支审查规则保持不变。
 4. 执行前检查实际分支、未提交改动和待审查工作；有未完成任务先收尾，不机械开始新任务。
 
@@ -378,6 +378,12 @@ git diff --exit-code -- go.mod go.sum
 - 4bb61a4完整六文件经再次及独立只读复核无阻断，按维护者授权保留历史合入main。分支CI42030392545与原始日志已核对：Go普通/race分别各107条Sandbox、626条启动/Provider，macOS编译及58项XCTest通过，三项路由测试逐项通过，无跳过。合并CI独立核验；本轮未重跑未变的本地源码和测试。
 - `fix/route-disclosure-branding`基于main b70bb2b。`ConversationRouteTransitionSheet`的「Start clean」说明和披露回执提示改用`LocalProductCopy.productName`；除此之外生产源码逐字不变。上下文选项、信任边界确认、权限、审批和回执规则不变。
 - 交付时先补源码回归，旧源码0/2、新源码2/2通过，本地Swift构建及有界Go普通/race通过。离屏渲染和确认门槛测试不等于安装后GUI或真实派发。两条文案不重复实现；Q06的治理、警告、导出、包显示名和兼容性预检余项见TASKS，未顺带修改。
+
+## Q06 Roundtable 创建引导（2026-11-06）
+
+- 1bcb257完整六文件经再次及独立只读复核无阻断，按维护者授权保留历史合入main。对应分支CI42174092042原始日志核对：Go普通/race各107条Sandbox、626条启动/Provider，macOS编译及60项XCTest通过，新增选入的两项均执行，无跳过。合并提交CI另验；本轮不重复执行未变化的本地基线。
+- `fix/roundtable-session-copy`基于main 48a26f0，仅把`RoundtableWorkbench.createSessionForm`的一句引导中的产品词改为`LocalProductCopy.productName`。完整生产文件对照仅此一处变化；创建、席位、五步流转与权限逻辑不变。
+- 交付时先补文案回归，旧源码8/9通过、仅品牌断言失败，修复后9/9；本地Swift构建、Go Roundtable普通/race各13条无跳过。未做安装后GUI或真实消息派发；此切片不再待审，不重复实现。Q06其余范围见TASKS，未顺带修改。
 
 ## 状态维护约定
 
