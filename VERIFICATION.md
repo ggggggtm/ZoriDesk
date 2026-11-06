@@ -268,3 +268,9 @@ Q12整项完成依据见[TASKS验收矩阵](TASKS.md#q12让诊断可理解可操
 `ConversationRouteTransitionSheet`接收待确认的路由变更，默认选「Summary only」。只有存在已冻结的源执行绑定，并且没有信任边界变更或用户已确认这些变更，`conversationRouteTransitionConfirmationEnabled`才允许确认。确认仍把所选上下文模式和确认状态交给`LocalProductStore.confirmConversationRouteTransition`，成功才关闭弹窗。`fix/route-disclosure-branding`只在「Start clean」详情和盾牌图标旁的回执说明引用`LocalProductCopy.productName`，不改变共享范围、凭证隔离、确认或回执逻辑；整个生产文件对照main b70bb2b除这两处外逐字相同。
 
 交付时用Foundation运行同一源码回归的两条断言，旧文案0/2、新文案2/2；本地应用构建、Go普通/race及语法检查通过。`verify-startup-ui.sh`保留原55项，追加文案、离屏渲染与确认门槛三项，正式XCTest由macOS CI执行。未做安装后GUI、实际路由派发或真实模型E2E。本切片不再待审，Q06整体仍进行中；本轮仅核实[TASKS余项](TASKS.md#q06统一用户可见品牌)，未改其他生产路径。
+
+### Roundtable 创建引导只改产品名（2026-11-06）
+
+未加载会话时显示`RoundtableWorkbench.createSessionForm`。创建按钮仍通过`createSession`调用Store并刷新快照，席位与后续 propose → relay → acknowledge → insert → conclude 流转保持原样。`fix/roundtable-session-copy`对照main 48a26f0，生产源码只替换引导`Text`中的一个产品词；不改按钮、文案的步骤说明、权限或API。
+
+先加文案回归，并用Foundation复跑实际源码断言：旧版8条席位断言通过、1条品牌断言失败，修复后9/9。Swift应用构建及脚本/测试语法检查通过；Go `internal/roundtable`普通/race各13条、无跳过。保留原58项macOS门禁，新增文案与既有席位检查共60项，正式XCTest待分支CI实跑。不是安装后GUI或真实消息派发；切片待审、未合main。
