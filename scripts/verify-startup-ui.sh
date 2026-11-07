@@ -52,6 +52,8 @@ brand_tests=(
   testProviderDiagnosticsUsePreviewedRedactedExport
   testVaultPageBrandingPreservesCredentialDisclosures
   testVaultImportAuthorizationAndPassphraseWiringUnchanged
+  testMissionGovernanceCopyPreservesAuthorityDisclosures
+  testMissionGovernanceWiringPreservesApprovalRecoveryAndRequester
 )
 brand_filter=$(IFS='|'; echo "${brand_tests[*]}")
 chat_state_tests=(

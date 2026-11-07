@@ -874,7 +874,7 @@ struct ProviderAccountPolicySheet: View {
             Text("Asia Pacific").tag("apac")
             Text("Local").tag("local")
           }
-          Text("These values record the account policy you selected. Loom does not independently certify Provider retention or region guarantees.")
+          Text("These values record the account policy you selected. \(LocalProductCopy.productName) does not independently certify Provider retention or region guarantees.")
             .font(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -2752,9 +2752,9 @@ func missionToolRecoveryConfirmationDetail(
 ) -> String {
   switch action {
   case .abortAttempt:
-    return "Close this Attempt at the uncertain side-effect boundary. Loom will not rerun the original ToolCall."
+    return "Close this Attempt at the uncertain side-effect boundary. \(LocalProductCopy.productName) will not rerun the original ToolCall."
   case .acceptObservedEffect:
-    return "Accept only the trusted observation bound to this candidate. Loom will not rerun the original ToolCall."
+    return "Accept only the trusted observation bound to this candidate. \(LocalProductCopy.productName) will not rerun the original ToolCall."
   case .retryInNewAttempt:
     return "Authorize the trusted replacement Attempt. The original ToolCall remains closed and will not be rerun."
   }
@@ -2818,7 +2818,7 @@ func endpointReviewPresentation(
     endpoint: candidate.endpoint,
     models: candidate.modelIDs,
     credentialEgressRisk:
-      "Approving this endpoint records permission for this exact destination. It does not import or send a credential. A separate import step is required before Loom can authenticate to \(origin).",
+      "Approving this endpoint records permission for this exact destination. It does not import or send a credential. A separate import step is required before \(LocalProductCopy.productName) can authenticate to \(origin).",
     reviewButtonAccessibilityLabel:
       "Review custom endpoint for \(candidate.displayName)",
     sheetAccessibilityLabel:
@@ -4565,7 +4565,7 @@ public struct MissionWorkbench: View {
           }
           Spacer()
         }
-        Text("A mode is only a proposal until Loom confirms authority.")
+        Text("A mode is only a proposal until \(LocalProductCopy.productName) confirms authority.")
           .font(.caption2)
           .foregroundStyle(.secondary)
       }
@@ -5052,7 +5052,7 @@ public struct MissionWorkbench: View {
       HStack {
         VStack(alignment: .leading, spacing: 4) {
           Text("New side task").font(.title2.weight(.semibold))
-          Text("Review the zero-write proposal before Loom starts an independent child run.")
+          Text("Review the zero-write proposal before \(LocalProductCopy.productName) starts an independent child run.")
             .font(.callout).foregroundStyle(.secondary)
         }
         Spacer()
@@ -7670,7 +7670,7 @@ public struct LoomDecisionSheet: View {
           ("Scope", sheet.permissionScope),
           ("Attempt", sheet.attemptScope),
         ])
-        Text("Loom will not change Provider, account, model, or Harness unless this exact versioned route is approved.")
+        Text("\(LocalProductCopy.productName) will not change Provider, account, model, or Harness unless this exact versioned route is approved.")
           .font(.caption)
           .foregroundStyle(.secondary)
       }

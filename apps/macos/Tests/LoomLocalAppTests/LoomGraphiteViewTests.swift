@@ -103,6 +103,71 @@ final class LoomGraphiteViewTests: XCTestCase {
         )
     }
 
+    func testMissionGovernanceCopyPreservesAuthorityDisclosures() throws {
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/LoomLocalAppUI/MissionWorkbench.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+        for fragment in [
+            #"Text("These values record the account policy you selected. \(LocalProductCopy.productName) does not independently certify Provider retention or region guarantees.")"#,
+            #"return "Close this Attempt at the uncertain side-effect boundary. \(LocalProductCopy.productName) will not rerun the original ToolCall.""#,
+            #"return "Accept only the trusted observation bound to this candidate. \(LocalProductCopy.productName) will not rerun the original ToolCall.""#,
+            #""Approving this endpoint records permission for this exact destination. It does not import or send a credential. A separate import step is required before \(LocalProductCopy.productName) can authenticate to \(origin).""#,
+            #"Text("A mode is only a proposal until \(LocalProductCopy.productName) confirms authority.")"#,
+            #"Text("Review the zero-write proposal before \(LocalProductCopy.productName) starts an independent child run.")"#,
+            #"Text("\(LocalProductCopy.productName) will not change Provider, account, model, or Harness unless this exact versioned route is approved.")"#,
+        ] {
+            XCTAssertTrue(source.contains(fragment), "Branding must preserve the full authority disclosure.")
+        }
+    }
+
+    func testMissionGovernanceWiringPreservesApprovalRecoveryAndRequester() throws {
+        let packageRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: packageRoot.appendingPathComponent("Sources/LoomLocalAppUI/MissionWorkbench.swift"),
+            encoding: .utf8
+        )
+        func section(from startMarker: String, to endMarker: String) throws -> String {
+            let start = try XCTUnwrap(source.range(of: startMarker))
+            let remaining = source[start.upperBound...]
+            let end = try XCTUnwrap(remaining.range(of: endMarker))
+            return String(remaining[..<end.lowerBound])
+        }
+        let recovery = try section(from: "private var recoveryDialogs: some View", to: "private var missionSheets:")
+        XCTAssertTrue(recovery.contains("get: { pendingToolRecovery != nil }"))
+        XCTAssertTrue(recovery.contains("set: { if !$0 { pendingToolRecovery = nil } }"))
+        XCTAssertTrue(recovery.contains("if let pending = pendingToolRecovery"))
+        XCTAssertTrue(recovery.contains("role: pending.action == .abortAttempt ? .destructive : nil"))
+        XCTAssertTrue(recovery.contains("await store.resolveToolRecovery(\n              pending.candidate, action: pending.action"))
+        XCTAssertTrue(recovery.contains(#"Button("Cancel", role: .cancel) { pendingToolRecovery = nil }"#))
+        XCTAssertTrue(recovery.contains("Text(missionToolRecoveryConfirmationDetail(pending.action))"))
+        let confirmation = try section(from: "func missionToolRecoveryConfirmationDetail(", to: "func resolvedMissionTeamID(")
+        XCTAssertTrue(confirmation.contains(#"return "Authorize the trusted replacement Attempt. The original ToolCall remains closed and will not be rerun.""#))
+
+        let endpoint = try section(from: "struct EndpointReviewConfirmationSheet: View", to: "public struct MissionWorkbench:")
+        XCTAssertTrue(endpoint.contains("onApprove()\n          dismiss()"))
+        XCTAssertTrue(endpoint.contains(#"Label("Approve Endpoint", systemImage: "checkmark.shield")"#))
+        XCTAssertFalse(endpoint.contains("importCredentialCandidate"))
+        XCTAssertTrue(source.contains("await store.approveEndpointCandidate(candidate)"))
+        XCTAssertTrue(source.contains("store.selectMissionPermissionMode(mode)"))
+        let sideTask = try section(from: "private func newSideTaskSheet(", to: "private var inspectorSectionIcon:")
+        XCTAssertTrue(sideTask.contains("if store.sideTaskProposal == nil"))
+        XCTAssertTrue(sideTask.contains("await store.proposeSideTask("))
+        XCTAssertTrue(sideTask.contains(#"Button("Confirm and run")"#))
+        XCTAssertTrue(sideTask.contains("Task { await store.confirmSideTaskProposal() }"))
+        XCTAssertTrue(source.contains(#"decisionRow("Requested by", sheet.requester)"#))
+        let store = try String(
+            contentsOf: packageRoot.appendingPathComponent("Sources/LoomLocalAppCore/LocalProductStore.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(store.contains(#"requester: "Loom authority""#))
+    }
+
     func testVaultPageBrandingPreservesCredentialDisclosures() throws {
         let sourceURL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
