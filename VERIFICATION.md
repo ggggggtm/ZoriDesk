@@ -284,3 +284,11 @@ Q12整项完成依据见[TASKS验收矩阵](TASKS.md#q12让诊断可理解可操
 `CredentialVaultExportSheet.chooseDestinationAndExport`先检查`canExport`，再弹出限定`.loomvault`类型的保存面板；确认后使用用户选定的`panel.url?.path`和原口令调用Store。`DiagnosticBundlePreviewSheet.exportBundle`仍限定JSON，确认后把所选URL和已审预览交给原Exporter。`fix/export-filename-branding`只新增两个`LocalProductCopy`建议名，并替换两处面板初始值，不自动导出、不替用户选路径、不更改格式、权限或内容。旧文件名和自定义目标仍可使用，既有测试里的旧目标路径刻意保留。
 
 交付时旧源码接线仅两个品牌断言失败，新版14/14；实际展示枚举/测试体普通及ThreadSanitizer探针各8/8，核对新名字、扩展名及无路径分隔符。探针不等于全应用并发保证或正式XCTest。本地Swift构建、语法/脚本及Go Sandbox普通/race通过；CI保留原60项并追加三项选择，逐项要求63项passed且拒绝skip/空选。未访问真实Vault、弹出保存面板或验证完整GUI。建议名切片不再待审，Q06余项另按TASKS分批处理，未顺带实现。
+
+### Vault 显示名与凭证处理分离（2026-11-07）
+
+验收更新：d85d8e0完整六文件经再次及新的独立只读复核无阻断，按明确授权保留历史合main。[分支CI42353510745](https://github.com/ggggggtm/ZoriDesk/actions/runs/42353510745)准确对应d85d8e0；原始日志核实Go普通/race各107条Sandbox、626条启动/Provider和macOS编译、65项XCTest通过，无跳过，两项Vault新增逐项passed。合并提交CI独立核验，不借用分支结果；源码、测试和脚本沿用已审版本。
+
+`fix/vault-page-branding`只替换两个Vault标题、迁移说明、导入按钮/一次性读取说明和两个帮助标签中的产品词。两个候选字段插值与“只读一次、加密、验证目标Provider、清除明文租约”的说明保留。完整`MissionWorkbench.swift`对照main 467d0bd仅7行、8个品牌替换；确认/取消、端点审批、可用凭证检查、口令长度及二次确认、口令清空、Store调用和所有数据路径不变。既有导出建议名不再修改。
+
+交付时两项源码回归先行：旧版7条品牌失败、26条授权/口令断言通过，修改后33/33。另取实际七条显示表达式及现有产品名，以虚构候选字段在普通/ThreadSanitizer探针中核对完整显示文本，各7/7；这不是实际界面交互或凭证E2E。Swift应用构建、测试/脚本语法和Go Sandbox普通/race各107条无跳过；原63项macOS检查完整保留，加两项共65项，逐项passed并拒绝skip/空选。切片不再待审，Q06仍in_progress，真实剩余见TASKS，未顺带实现。

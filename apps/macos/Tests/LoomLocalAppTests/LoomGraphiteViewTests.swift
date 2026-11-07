@@ -103,6 +103,78 @@ final class LoomGraphiteViewTests: XCTestCase {
         )
     }
 
+    func testVaultPageBrandingPreservesCredentialDisclosures() throws {
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/LoomLocalAppUI/MissionWorkbench.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+        let expected = [
+            #"Label("\(LocalProductCopy.productName) Credential Vault", systemImage: "lock.fill")"#,
+            #""Re-enter this account's API key once to move it into \(LocalProductCopy.productName) Credential Vault. Existing Keychain data is not read during conversations.""#,
+            #"Button("Import to \(LocalProductCopy.productName) Vault")"#,
+            #""\(LocalProductCopy.productName) will read only this \(candidate.sourceApplication) credential once, encrypt it in the \(LocalProductCopy.productName) Credential Vault, verify \(candidate.targetProviderID), and clear the plaintext lease.""#,
+            #"Text("\(LocalProductCopy.productName) Credential Vault").font(.headline)"#,
+            #".help("Import this approved endpoint credential into the \(LocalProductCopy.productName) Vault")"#,
+            #".help("Import this credential into the \(LocalProductCopy.productName) Vault")"#,
+        ]
+        for fragment in expected {
+            XCTAssertTrue(source.contains(fragment), "Vault copy must retain its exact disclosure while identifying the product.")
+        }
+    }
+
+    func testVaultImportAuthorizationAndPassphraseWiringUnchanged() throws {
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/LoomLocalAppUI/MissionWorkbench.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+        func section(from startMarker: String, to endMarker: String) throws -> String {
+            let start = try XCTUnwrap(source.range(of: startMarker))
+            let remaining = source[start.upperBound...]
+            let end = try XCTUnwrap(remaining.range(of: endMarker))
+            return String(remaining[..<end.lowerBound])
+        }
+        let export = try section(
+            from: "private struct CredentialVaultExportSheet: View {",
+            to: "private struct ProviderCredentialSheet:"
+        )
+        XCTAssertTrue(export.contains(#"SecureField("Backup passphrase", text: $passphrase)"#))
+        XCTAssertTrue(export.contains(#"SecureField("Confirm passphrase", text: $confirmation)"#))
+        XCTAssertTrue(export.contains("let count = passphrase.utf8.count"))
+        XCTAssertTrue(export.contains("return count >= 12 && count <= 1_024 && passphrase == confirmation"))
+        XCTAssertTrue(export.contains("&& !store.isExportingCredentialVault"))
+        XCTAssertTrue(export.contains(".disabled(!canExport)"))
+        XCTAssertTrue(export.contains("guard canExport else { return }"))
+        XCTAssertTrue(export.contains("let submittedPassphrase = passphrase"))
+        XCTAssertTrue(export.contains(#"passphrase = """#))
+        XCTAssertTrue(export.contains(#"confirmation = """#))
+        XCTAssertTrue(export.contains("await store.exportCredentialVault("))
+        XCTAssertTrue(export.contains("passphrase: submittedPassphrase"))
+        XCTAssertTrue(export.contains("destination: destination"))
+
+        let dialog = try section(from: "private var credentialDialogs: some View {", to: "private var recoveryDialogs:")
+        XCTAssertTrue(dialog.contains(#"pendingCredentialImport.map { "Import \($0.displayName)?" }"#))
+        XCTAssertTrue(dialog.contains("get: { pendingCredentialImport != nil }"))
+        XCTAssertTrue(dialog.contains("set: { if !$0 { pendingCredentialImport = nil } }"))
+        XCTAssertTrue(dialog.contains("if let candidate = pendingCredentialImport"))
+        XCTAssertTrue(dialog.contains("pendingCredentialImport = nil\n          Task { await store.importCredentialCandidate(candidate) }"))
+        XCTAssertTrue(dialog.contains(#"Button("Cancel", role: .cancel) { pendingCredentialImport = nil }"#))
+
+        let row = try section(from: "private func credentialImportRow(", to: "private var failureLabPanel:")
+        XCTAssertTrue(row.contains(#"candidate.importMode == "custom_endpoint_review""#))
+        let approval = try XCTUnwrap(row.range(of: "if store.approvedEndpointReview("))
+        let imported = try XCTUnwrap(row.range(of: "Task { await store.importCredentialCandidate(candidate) }"))
+        XCTAssertTrue(approval.lowerBound < imported.lowerBound)
+        XCTAssertTrue(row.contains("candidateDigest: candidate.candidateDigest"))
+        XCTAssertTrue(row.contains("providerAccountID: accountID"))
+        XCTAssertTrue(row.contains("pendingEndpointReview = candidate"))
+        XCTAssertTrue(row.contains("pendingCredentialImport = candidate"))
+        XCTAssertTrue(row.contains(".disabled(!candidate.credentialAvailable)"))
+    }
+
     func testExportSuggestedFilenamesUseProductName() {
         XCTAssertEqual(
             LocalProductCopy.credentialVaultExportSuggestedFilename,
