@@ -103,6 +103,64 @@ final class LoomGraphiteViewTests: XCTestCase {
         )
     }
 
+    func testExportSuggestedFilenamesUseProductName() {
+        XCTAssertEqual(
+            LocalProductCopy.credentialVaultExportSuggestedFilename,
+            "ZoriDesk-Credential-Vault.loomvault"
+        )
+        XCTAssertEqual(
+            LocalProductCopy.diagnosticBundleExportSuggestedFilename,
+            "zoridesk-diagnostics.json"
+        )
+        XCTAssertEqual(
+            URL(fileURLWithPath: LocalProductCopy.credentialVaultExportSuggestedFilename).pathExtension,
+            "loomvault"
+        )
+        XCTAssertEqual(
+            URL(fileURLWithPath: LocalProductCopy.diagnosticBundleExportSuggestedFilename).pathExtension,
+            "json"
+        )
+        for filename in [
+            LocalProductCopy.credentialVaultExportSuggestedFilename,
+            LocalProductCopy.diagnosticBundleExportSuggestedFilename,
+        ] {
+            XCTAssertFalse(filename.contains("/"))
+            XCTAssertFalse(filename.contains("\\"))
+        }
+    }
+
+    func testExportFilenameBrandWiringPreservesUserDestination() throws {
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/LoomLocalAppUI/MissionWorkbench.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+        let vaultStart = try XCTUnwrap(source.range(of: "private func chooseDestinationAndExport() {"))
+        let afterVaultStart = source[vaultStart.upperBound...]
+        let vaultEnd = try XCTUnwrap(afterVaultStart.range(of: "private struct ProviderCredentialSheet:"))
+        let vault = afterVaultStart[..<vaultEnd.lowerBound]
+        let diagnosticStart = try XCTUnwrap(source.range(of: "private func exportBundle() {"))
+        let afterDiagnosticStart = source[diagnosticStart.upperBound...]
+        let diagnosticEnd = try XCTUnwrap(afterDiagnosticStart.range(of: "private func abbreviated("))
+        let diagnostic = afterDiagnosticStart[..<diagnosticEnd.lowerBound]
+
+        XCTAssertTrue(vault.contains("panel.nameFieldStringValue = LocalProductCopy.credentialVaultExportSuggestedFilename"))
+        XCTAssertTrue(vault.contains("guard canExport else { return }"))
+        XCTAssertTrue(vault.contains(#"UTType(filenameExtension: "loomvault")"#))
+        XCTAssertTrue(vault.contains("panel.allowedContentTypes = [type]"))
+        XCTAssertTrue(vault.contains("guard panel.runModal() == .OK, let destination = panel.url?.path else"))
+        XCTAssertTrue(vault.contains("let submittedPassphrase = passphrase"))
+        XCTAssertTrue(vault.contains(#"passphrase = """#))
+        XCTAssertTrue(vault.contains("await store.exportCredentialVault("))
+        XCTAssertTrue(vault.contains("passphrase: submittedPassphrase"))
+        XCTAssertTrue(vault.contains("destination: destination"))
+        XCTAssertTrue(diagnostic.contains("panel.nameFieldStringValue = LocalProductCopy.diagnosticBundleExportSuggestedFilename"))
+        XCTAssertTrue(diagnostic.contains("panel.allowedContentTypes = [.json]"))
+        XCTAssertTrue(diagnostic.contains("guard panel.runModal() == .OK, let destination = panel.url else"))
+        XCTAssertTrue(diagnostic.contains("try exporter.export(preview, to: destination)"))
+    }
+
     func testWorkspaceBrandWiringPreservesCompatibilityIdentifiers() async throws {
         let packageRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

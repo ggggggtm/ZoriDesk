@@ -47,6 +47,9 @@ brand_tests=(
   testWorkspaceBrandHeaderRendersWideAndCompact
   testRoundtableCreationGuideUsesProductName
   testRoundtableSupportsDragDropAndSeatRemoval
+  testExportSuggestedFilenamesUseProductName
+  testExportFilenameBrandWiringPreservesUserDestination
+  testProviderDiagnosticsUsePreviewedRedactedExport
 )
 brand_filter=$(IFS='|'; echo "${brand_tests[*]}")
 chat_state_tests=(

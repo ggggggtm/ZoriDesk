@@ -228,7 +228,7 @@ private struct CredentialVaultExportSheet: View {
     let panel = NSSavePanel()
     panel.canCreateDirectories = true
     panel.isExtensionHidden = false
-    panel.nameFieldStringValue = "Loom-Credential-Vault.loomvault"
+    panel.nameFieldStringValue = LocalProductCopy.credentialVaultExportSuggestedFilename
     if let type = UTType(filenameExtension: "loomvault") {
       panel.allowedContentTypes = [type]
     }
@@ -1686,7 +1686,7 @@ struct DiagnosticBundlePreviewSheet: View {
     let panel = NSSavePanel()
     panel.allowedContentTypes = [.json]
     panel.canCreateDirectories = true
-    panel.nameFieldStringValue = "loom-diagnostics.json"
+    panel.nameFieldStringValue = LocalProductCopy.diagnosticBundleExportSuggestedFilename
     guard panel.runModal() == .OK, let destination = panel.url else { return }
     do {
       try exporter.export(preview, to: destination)
