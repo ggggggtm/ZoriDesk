@@ -37,6 +37,10 @@ public enum LocalProductCopy {
     public static let connectionReconnectingDetail = "\(productName) reconnects automatically. Try again if this continues."
     public static let missionConnectingTitle = "Connecting to \(productName)"
     public static let missionStartingServiceBanner = "Starting the \(productName) service on this Mac"
+    public static let credentialVaultExportSuggestedFilename =
+        "\(productName)-Credential-Vault.loomvault"
+    public static let diagnosticBundleExportSuggestedFilename =
+        "\(productName.lowercased())-diagnostics.json"
     public static let homeTitle = "Your local agent workspace"
     public static let homeSubtitle =
         "Follow delegated work, team activity, and items that need you."

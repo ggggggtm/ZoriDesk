@@ -276,3 +276,11 @@ Q12整项完成依据见[TASKS验收矩阵](TASKS.md#q12让诊断可理解可操
 未加载会话时显示`RoundtableWorkbench.createSessionForm`。创建按钮仍通过`createSession`调用Store并刷新快照，席位与后续 propose → relay → acknowledge → insert → conclude 流转保持原样。`fix/roundtable-session-copy`对照main 48a26f0，生产源码只替换引导`Text`中的一个产品词；不改按钮、文案的步骤说明、权限或API。
 
 交付时用Foundation复跑实际源码断言：旧版8条席位断言通过、1条品牌断言失败，修复后9/9。Swift应用构建及语法检查通过；Go `internal/roundtable`本地普通/race各13条、无跳过。保留原58项macOS门禁，新增文案与既有席位检查共60项，不是安装后GUI或真实消息派发。该引导不再待审，Q06其余[TASKS范围](TASKS.md#q06统一用户可见品牌)未顺带修改。
+
+### 导出建议名不是实际存储位置（2026-11-07）
+
+验收更新：396cba2完整差异经再次及独立只读复核无阻断，按授权保留历史合main。[分支CI42349742248](https://github.com/ggggggtm/ZoriDesk/actions/runs/42349742248)准确对应396cba2；原始日志核实Go普通/race各107条Sandbox、626条启动/Provider和macOS编译、63项XCTest通过，无跳过。合并提交CI独立核验，生产、测试、脚本沿用已审分支，不重复修改。
+
+`CredentialVaultExportSheet.chooseDestinationAndExport`先检查`canExport`，再弹出限定`.loomvault`类型的保存面板；确认后使用用户选定的`panel.url?.path`和原口令调用Store。`DiagnosticBundlePreviewSheet.exportBundle`仍限定JSON，确认后把所选URL和已审预览交给原Exporter。`fix/export-filename-branding`只新增两个`LocalProductCopy`建议名，并替换两处面板初始值，不自动导出、不替用户选路径、不更改格式、权限或内容。旧文件名和自定义目标仍可使用，既有测试里的旧目标路径刻意保留。
+
+交付时旧源码接线仅两个品牌断言失败，新版14/14；实际展示枚举/测试体普通及ThreadSanitizer探针各8/8，核对新名字、扩展名及无路径分隔符。探针不等于全应用并发保证或正式XCTest。本地Swift构建、语法/脚本及Go Sandbox普通/race通过；CI保留原60项并追加三项选择，逐项要求63项passed且拒绝skip/空选。未访问真实Vault、弹出保存面板或验证完整GUI。建议名切片不再待审，Q06余项另按TASKS分批处理，未顺带实现。
