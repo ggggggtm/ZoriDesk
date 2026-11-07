@@ -17,8 +17,8 @@
 | 公开仓库初始化 | 已完成；2026-11-02通过GitHub原生操作脱离Fork网络，地址/ID、12分支SHA及320个可达提交未变，必要来源与许可保留 |
 | 项目介绍 | 已发布 README，提交 510fdc956d74e533eb6b43551e1fffc3d10d24ef |
 | 运行时代码 | Provider凭证回显修复dcc3aa6经再次完整及独立复核，按维护者授权保留历史合入main；Q12按下方既定有界验收关闭，不代表全应用安全审计完成 |
-| 构建、测试、端到端验证 | 导出建议名提交396cba2的[分支CI42349742248](https://github.com/ggggggtm/ZoriDesk/actions/runs/42349742248)通过：Go普通/race启动各626条、Sandbox各107条，macOS编译及63项XCTest，无跳过。合并提交CI单独核验。完整GUI、真实恢复、模型E2E及全仓未验证 |
-| 应用与服务内部名称 | 窗口/侧栏/聊天、连接、故障/恢复、Provider固定提示、对话披露和Roundtable引导已验收；两个保存窗口建议名经复核合入main。Q06仍in_progress，兼容标识保留 |
+| 构建、测试、端到端验证 | main 467d0bd的[合并CI42352501611](https://github.com/ggggggtm/ZoriDesk/actions/runs/42352501611)通过：Go普通/race启动各626条、Sandbox各107条，macOS编译及63项XCTest，无跳过。Vault页面分支本地构建与定向检查通过，65项XCTest待分支CI实跑。完整GUI、真实恢复、模型E2E及全仓未验证 |
+| 应用与服务内部名称 | 此前界面和两个保存建议名已验收；Vault页面7处固定文案在`fix/vault-page-branding`待审。Q06仍in_progress，兼容标识保留 |
 | 本地开发与提交环境 | 已建立独立 checkout；SSH 认证到正确所有者，仓库级个人提交身份已配置；Q00 记录已真实推送并核对远端 SHA |
 | Docker / Kubernetes 后端 | 后续规划，不能写成已交付能力 |
 | 发布版本 | 尚未发布 ZoriDesk 版本 |
@@ -34,7 +34,7 @@
 ## 下一步
 
 1. Q00、Q03 经复核并按维护者明确授权合入 main，状态 done；不重复初始化或创建模板。此授权仅针对这两个任务，不改变以后定时维护的分支审查规则。
-2. Q12保持done。先核验导出建议名的合并CI；后续Q06按[TASKS](TASKS.md#q06统一用户可见品牌)分批处理，不重复本切片或已验收界面，不提前Q07/Q08迁移，不自动合main。
+2. Q12保持done。先核验Vault页面分支CI并等待审查；后续Q06按[TASKS](TASKS.md#q06统一用户可见品牌)分批处理，不重复本切片或已验收界面，不提前Q07/Q08迁移，不自动合main。
 3. Q04 随代码和测试同步补充真实路径与关键函数，不阻塞 Q05/Q09；品牌与兼容性任务后置，原有验收、安全边界和分支审查规则保持不变。
 4. 执行前检查实际分支、未提交改动和待审查工作；有未完成任务先收尾，不机械开始新任务。
 
@@ -390,6 +390,11 @@ git diff --exit-code -- go.mod go.sum
 - 396cba2完整七文件经再次及独立只读复核无阻断，按维护者授权保留历史合入main。分支CI42349742248准确SHA和原始日志核对：Go普通/race各107条Sandbox、626条启动/Provider，macOS编译及63项XCTest通过，三项新选入检查逐项通过，无跳过。合并CI另验，本轮不机械重跑相同本地基线。
 - `fix/export-filename-branding`基于main 810df65。仅新增两条`LocalProductCopy`展示常量，并替换两个`NSSavePanel.nameFieldStringValue`引用，建议名为`ZoriDesk-Credential-Vault.loomvault`及`zoridesk-diagnostics.json`。文件类型、用户选定路径、口令/权限、导出内容和诊断过滤不变。
 - 交付时旧源码接线仅两条品牌断言失败，修改后14/14；展示值普通/ThreadSanitizer探针各8/8、本地构建和Go Sandbox普通/race通过。未打开真实保存面板或访问用户Vault；该切片不再待审，不重复默认文件名。其余Q06仍见TASKS，本轮未顺带实现。
+
+## Q06 Vault 页面文案（2026-11-07）
+
+- `fix/vault-page-branding`基于main 467d0bd，仅替换`MissionWorkbench.swift`的7处固定显示文案、8个品牌词，引用`LocalProductCopy.productName`。完整生产文件除此之外逐字不变；标题、迁移和一次性导入说明、按钮及帮助的其余措辞保留，已验收的导出建议名不动。
+- 先补两项回归。旧源码只有7条品牌断言失败、26条授权/口令源码检查通过；修改后33/33。七条实际显示表达式普通/ThreadSanitizer探针各7/7，Swift构建和Go Sandbox普通/race各107条无跳过。原63项macOS门禁保留，加两项共65项须由对应CI执行。未操作真实导入界面、用户Vault或口令，切片待审、不合main。
 
 ## 状态维护约定
 

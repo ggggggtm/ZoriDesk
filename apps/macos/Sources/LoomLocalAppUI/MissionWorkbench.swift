@@ -434,7 +434,7 @@ private struct ProviderCredentialSheet: View {
           Text(displayStatus(visibleStatus))
             .font(.callout.weight(.medium))
           Spacer()
-          Label("Loom Credential Vault", systemImage: "lock.fill")
+          Label("\(LocalProductCopy.productName) Credential Vault", systemImage: "lock.fill")
             .font(.caption)
             .foregroundStyle(.secondary)
         }
@@ -465,7 +465,7 @@ private struct ProviderCredentialSheet: View {
 
         if current.status == "migration_required" {
           Text(
-            "Re-enter this account's API key once to move it into Loom Credential Vault. Existing Keychain data is not read during conversations."
+            "Re-enter this account's API key once to move it into \(LocalProductCopy.productName) Credential Vault. Existing Keychain data is not read during conversations."
           )
           .font(.callout)
           .foregroundStyle(.secondary)
@@ -3142,7 +3142,7 @@ public struct MissionWorkbench: View {
       titleVisibility: .visible
     ) {
       if let candidate = pendingCredentialImport {
-        Button("Import to Loom Vault") {
+        Button("Import to \(LocalProductCopy.productName) Vault") {
           pendingCredentialImport = nil
           Task { await store.importCredentialCandidate(candidate) }
         }
@@ -3151,7 +3151,7 @@ public struct MissionWorkbench: View {
     } message: {
       if let candidate = pendingCredentialImport {
         Text(
-          "Loom will read only this \(candidate.sourceApplication) credential once, encrypt it in the Loom Credential Vault, verify \(candidate.targetProviderID), and clear the plaintext lease."
+          "\(LocalProductCopy.productName) will read only this \(candidate.sourceApplication) credential once, encrypt it in the \(LocalProductCopy.productName) Credential Vault, verify \(candidate.targetProviderID), and clear the plaintext lease."
         )
       }
     }
@@ -6813,7 +6813,7 @@ public struct MissionWorkbench: View {
         .foregroundStyle(providerStatusColor(vault.status))
         .frame(width: 32, height: 32)
         VStack(alignment: .leading, spacing: 2) {
-          Text("Loom Credential Vault").font(.headline)
+          Text("\(LocalProductCopy.productName) Credential Vault").font(.headline)
           Text(credentialVaultDetail(vault))
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -7112,7 +7112,7 @@ public struct MissionWorkbench: View {
             Label("Import", systemImage: "tray.and.arrow.down")
           }
           .buttonStyle(.bordered)
-          .help("Import this approved endpoint credential into the Loom Vault")
+          .help("Import this approved endpoint credential into the \(LocalProductCopy.productName) Vault")
           .loomActionTarget()
         } else if inFlight {
           ProgressView()
@@ -7143,7 +7143,7 @@ public struct MissionWorkbench: View {
         }
         .buttonStyle(.bordered)
         .disabled(!candidate.credentialAvailable)
-        .help("Import this credential into the Loom Vault")
+        .help("Import this credential into the \(LocalProductCopy.productName) Vault")
         .loomActionTarget()
       }
     }

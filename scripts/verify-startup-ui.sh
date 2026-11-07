@@ -50,6 +50,8 @@ brand_tests=(
   testExportSuggestedFilenamesUseProductName
   testExportFilenameBrandWiringPreservesUserDestination
   testProviderDiagnosticsUsePreviewedRedactedExport
+  testVaultPageBrandingPreservesCredentialDisclosures
+  testVaultImportAuthorizationAndPassphraseWiringUnchanged
 )
 brand_filter=$(IFS='|'; echo "${brand_tests[*]}")
 chat_state_tests=(
