@@ -300,3 +300,9 @@ Q12整项完成依据见[TASKS验收矩阵](TASKS.md#q12让诊断可理解可操
 账号策略说明不代表产品独立认证Provider承诺；`endpointReviewPresentation`说明端点审批只记录精确目的地权限，不导入或发送凭证；权限模式仍只是提议，子运行先审零写入提案。`missionToolRecoveryConfirmationDetail`继续说明原ToolCall不重跑，备用路由须精确版本审批。`fix/mission-governance-copy`只在这7条固定显示文本中引用既有产品名，完整生产文件其余字节不变；确认/取消、审批回调、恢复动作、子运行提议/确认及结构化`requester`均未改，已有Vault和其他品牌切片不重复。
 
 先加`testMissionGovernanceCopyPreservesAuthorityDisclosures`和`testMissionGovernanceWiringPreservesApprovalRecoveryAndRequester`：旧源码7条品牌断言失败、19条接线检查通过，修改后同一测试体普通和ThreadSanitizer探针均26/26；实际7条显示表达式及现有产品枚举另各7/7，含虚构origin插值。探针是有限路径检查，不是本地正式XCTest、真实权限操作、GUI E2E或全应用无竞态证明。Swift构建、语法/脚本和Go Sandbox普通/race各107条无跳过；CI保留原65项并追加两项，共67项逐项要求passed、拒绝skip/空选。此切片不再待审，Q06余项另在新分支集中处理。
+
+### 只在展示出口统一余下品牌（2026-11-11）
+
+`conversationMessageDisplayText`在原`displayContent`过滤之后处理安全警告：原过滤结果或来自已知暂定回复的精确旧固定警告显示ZoriDesk，仍明确“未执行”，只用于聊天正文、非用户读屏和复制。原Go回复、Swift Core、序列化消息及`chatMissionObjectiveText`不动。`missionDecisionRequesterLabel`仅在已知只读Review Gate或已准备的备用路由视图识别固定标签；`missionPreflightBlockReasonText`只映射主/回退节点精确旧理由，保留请求者、原预检理由、审批摘要及动作。Info.plist只修改两个显示名称，打包复制流程及身份键不变。
+
+四项回归先于生产修改。实际旧UI/Core与接线/元数据探针4/11、仅7处展示失败，修改后同一检查11/11。八个新增及受影响的测试体通过断言适配器链接实际UI/Core，普通与ThreadSanitizer各146/146；真实Swift应用构建16.16秒，plist、测试语法、脚本及差异检查通过。原67项门禁保留，增加四项共71项逐项拒绝失败/跳过；本机CLT探针不是正式XCTest，须由对应分支CI执行。未机械重跑不变的本地Go基线、未运行会签名/启动的包测试，实际安装菜单和完整GUI/模型/审批E2E均不宣称通过。本批待审、不合main。

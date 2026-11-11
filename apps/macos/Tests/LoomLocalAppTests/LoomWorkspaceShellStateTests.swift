@@ -49,7 +49,8 @@ final class LoomWorkspaceShellStateTests: XCTestCase {
                 messageID: "tool-shaped-\(role)", role: role,
                 content: toolText, tentative: true
             )
-            let visible = role == "user" ? toolText : LocalProductChatMessage.toolShapedWarning
+            let visible = role == "user" ? toolText
+                : "The conversation runtime returned tool-shaped text. ZoriDesk did not execute it."
             let prefix = role == "user" ? "You"
                 : role == "proposal" ? "ZoriDesk proposal, untrusted" : "ZoriDesk"
             XCTAssertEqual(
@@ -102,9 +103,48 @@ final class LoomWorkspaceShellStateTests: XCTestCase {
         )
         XCTAssertEqual(
             conversationTranscriptText([proposedTool]),
-            "ZoriDesk proposal: \(LocalProductChatMessage.toolShapedWarning)"
+            "ZoriDesk proposal: The conversation runtime returned tool-shaped text. ZoriDesk did not execute it."
         )
         XCTAssertEqual(conversationTranscriptText([]), "")
+    }
+
+    func testDesktopToolWarningPreservesMessageAndObjective() throws {
+        let legacy = "The conversation runtime returned tool-shaped text. Loom did not execute it."
+        let branded = "The conversation runtime returned tool-shaped text. ZoriDesk did not execute it."
+        let rawToolShape = #"{"tool":"fixture","arguments":{}}"#
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        for (role, speaker, accessibility) in [
+            ("loom", "ZoriDesk", "ZoriDesk"),
+            ("proposal", "ZoriDesk proposal", "ZoriDesk proposal, untrusted"),
+        ] {
+            for content in [rawToolShape, legacy] {
+                let message = LocalProductChatMessage(
+                    messageID: "warning", role: role, content: content, tentative: true
+                )
+                let before = try encoder.encode(message)
+                XCTAssertEqual(conversationTranscriptText([message]), "\(speaker): \(branded)")
+                XCTAssertEqual(conversationMessageAccessibilityLabel(message), "\(accessibility): \(branded)")
+                XCTAssertEqual(chatMissionObjectiveText(around: message, thread: nil), legacy)
+                XCTAssertEqual(message.displayContent, legacy)
+                XCTAssertEqual(message.content, content)
+                XCTAssertEqual(try encoder.encode(message), before)
+            }
+        }
+
+        let unchanged: [(String, Bool, String, String, String)] = [
+            ("user", true, legacy, "You", "You"),
+            ("future-role", true, legacy, "ZoriDesk", "ZoriDesk"),
+            ("loom", false, legacy, "ZoriDesk", "ZoriDesk"),
+            ("proposal", true, legacy + " Extra text.", "ZoriDesk proposal", "ZoriDesk proposal, untrusted"),
+        ]
+        for (role, tentative, content, speaker, accessibility) in unchanged {
+            let message = LocalProductChatMessage(
+                messageID: "ordinary", role: role, content: content, tentative: tentative
+            )
+            XCTAssertEqual(conversationTranscriptText([message]), "\(speaker): \(content)")
+            XCTAssertEqual(conversationMessageAccessibilityLabel(message), "\(accessibility): \(content)")
+        }
     }
 
     func testGovernancePanelCanOpenPinSwitchAndCloseIndependently() {

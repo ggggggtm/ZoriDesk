@@ -67,6 +67,8 @@ final class LoomGraphiteViewTests: XCTestCase {
         let timeline = String(source[timelineStart.lowerBound..<composerStart.lowerBound])
         let composer = String(source[composerStart.lowerBound..<composerEnd.lowerBound])
         XCTAssertTrue(timeline.contains("Text(conversationSpeakerLabel(for: message.role))"))
+        XCTAssertTrue(timeline.contains("Text(conversationMessageDisplayText(message))"))
+        XCTAssertEqual(timeline.components(separatedBy: "copyChatMessage(conversationMessageDisplayText(message))").count - 1, 2)
         XCTAssertTrue(timeline.contains(
             ".accessibilityLabel(conversationMessageAccessibilityLabel(message))"
         ))
@@ -160,12 +162,116 @@ final class LoomGraphiteViewTests: XCTestCase {
         XCTAssertTrue(sideTask.contains("await store.proposeSideTask("))
         XCTAssertTrue(sideTask.contains(#"Button("Confirm and run")"#))
         XCTAssertTrue(sideTask.contains("Task { await store.confirmSideTaskProposal() }"))
-        XCTAssertTrue(source.contains(#"decisionRow("Requested by", sheet.requester)"#))
+        XCTAssertTrue(source.contains(#"decisionRow("Requested by", missionDecisionRequesterLabel(sheet))"#))
         let store = try String(
             contentsOf: packageRoot.appendingPathComponent("Sources/LoomLocalAppCore/LocalProductStore.swift"),
             encoding: .utf8
         )
         XCTAssertTrue(store.contains(#"requester: "Loom authority""#))
+    }
+
+    func testMissionDecisionRequesterDisplayPreservesAuthorityData() {
+        func sheet(
+            _ kind: LocalProductDecisionKind,
+            requester: String,
+            id: String,
+            prepared: Bool,
+            digest: String = "",
+            scope: String = "read-only",
+            schema: Int = 1
+        ) -> LocalProductDecisionSheet {
+            LocalProductDecisionSheet(
+                schemaVersion: schema, kind: kind, missionID: "mission-fixture",
+                teamInstanceID: "team-fixture", viewVersion: "view-fixture",
+                decisionID: id, decisionDigest: digest, title: "Decision", summary: "Fixture",
+                requester: requester, target: "Agent", commandType: "Review",
+                networkAccess: "none", credentialAccess: "none", permissionScope: scope,
+                attemptScope: "Attempt 2", expectedEvidence: "none", technicalDetails: [],
+                actions: ["not_now", "approve_fallback"],
+                preparedActions: prepared ? ["approve_fallback"] : [], prepared: prepared,
+                logicalNodeID: "node-fixture", attemptNumber: 2, claimGeneration: 0
+            )
+        }
+        let reviewID = "unprepared-review-mission-fixture"
+        let fallbackID = "fallback-" + String(repeating: "a", count: 32)
+        let review = sheet(.review, requester: "Loom authority", id: reviewID, prepared: false)
+        let fallback = sheet(.fallback, requester: "Loom", id: fallbackID, prepared: true, digest: "intent-digest")
+        XCTAssertEqual(missionDecisionRequesterLabel(review), "ZoriDesk authority")
+        XCTAssertEqual(missionDecisionRequesterLabel(fallback), "ZoriDesk")
+        XCTAssertEqual(review.requester, "Loom authority")
+        XCTAssertEqual(fallback.requester, "Loom")
+        XCTAssertEqual(fallback.decisionDigest, "intent-digest")
+        XCTAssertEqual(fallback.preparedActions, ["approve_fallback"])
+
+        let unchanged = [
+            sheet(.authorization, requester: "Loom", id: fallbackID, prepared: true, digest: "intent-digest"),
+            sheet(.review, requester: "Loom authority", id: reviewID, prepared: true),
+            sheet(.review, requester: "Loom authority", id: "unprepared-review-other", prepared: false),
+            sheet(.review, requester: "Loom authority", id: reviewID, prepared: false, scope: "other"),
+            sheet(.fallback, requester: "Loom", id: fallbackID, prepared: false, digest: "intent-digest"),
+            sheet(.fallback, requester: "Loom", id: "other-fallback", prepared: true, digest: "intent-digest"),
+            sheet(.fallback, requester: "Loom", id: fallbackID, prepared: true),
+            sheet(.fallback, requester: "Loom operator", id: fallbackID, prepared: true, digest: "intent-digest"),
+            sheet(.fallback, requester: "Loom", id: fallbackID, prepared: true, digest: "intent-digest", schema: 2),
+        ]
+        for value in unchanged {
+            XCTAssertEqual(missionDecisionRequesterLabel(value), value.requester)
+        }
+    }
+
+    func testMissionPreflightBlockReasonBrandingIsExact() throws {
+        let legacy = "Remote tool enrollment backend is not supported by this Loom build."
+        let branded = "Remote tool enrollment backend is not supported by this ZoriDesk build."
+        let digest = String(repeating: "e", count: 64)
+        let fixture: [String: Any] = [
+            "logical_node_id": "node-fixture", "title": "Agent", "role": "agent",
+            "depends_on": [String](), "max_attempts": 1,
+            "harness_adapter": "loom-native", "provider_id": "provider-fixture",
+            "model_id": "model-fixture", "auth_mode": "native_auth", "timeout_seconds": 30,
+            "status": "blocked", "block_reason": legacy,
+            "fallback_configured": true, "fallback_approval_required": true,
+            "fallback_harness_adapter": "loom-native", "fallback_provider_id": "provider-fixture",
+            "fallback_model_id": "fallback-model-fixture", "fallback_auth_mode": "native_auth",
+            "fallback_timeout_seconds": 30, "fallback_status": "blocked", "fallback_block_reason": legacy,
+            "remote_tool_enrollment_available": true, "remote_tool_enrollment_id": "enr-fixture",
+            "remote_tool_backend_kind": "web_search", "remote_tool_binding_digest": digest,
+        ]
+        let node = try JSONDecoder().decode(
+            LocalProductExecutionNodePreview.self,
+            from: JSONSerialization.data(withJSONObject: fixture)
+        )
+        XCTAssertEqual(missionPreflightBlockReasonText(node.blockReason), branded)
+        XCTAssertEqual(missionPreflightBlockReasonText(node.fallbackBlockReason), branded)
+        XCTAssertEqual(node.blockReason, legacy)
+        XCTAssertEqual(node.fallbackBlockReason, legacy)
+        XCTAssertEqual(node.remoteToolBindingDigest, digest)
+        for reason in ["", "Unsupported Loom fixture.", " " + legacy, legacy + " More detail."] {
+            XCTAssertEqual(missionPreflightBlockReasonText(reason), reason)
+        }
+
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/LoomLocalAppUI/MissionWorkbench.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+        XCTAssertTrue(source.contains("Text(missionPreflightBlockReasonText(node.blockReason))"))
+        XCTAssertTrue(source.contains("Text(missionPreflightBlockReasonText(node.fallbackBlockReason))"))
+    }
+
+    func testDesktopBundleDisplayNamesPreserveBundleIdentity() throws {
+        let infoURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Resources/Info.plist")
+        let value = try PropertyListSerialization.propertyList(from: Data(contentsOf: infoURL), format: nil)
+        let info = try XCTUnwrap(value as? [String: Any])
+        XCTAssertEqual(info["CFBundleDisplayName"] as? String, LocalProductCopy.productName)
+        XCTAssertEqual(info["CFBundleName"] as? String, LocalProductCopy.productName)
+        XCTAssertEqual(info["CFBundleIdentifier"] as? String, "com.earendilworks.loom.local")
+        XCTAssertEqual(info["CFBundleExecutable"] as? String, "LoomLocalApp")
+        XCTAssertEqual(info["CFBundlePackageType"] as? String, "APPL")
     }
 
     func testVaultPageBrandingPreservesCredentialDisclosures() throws {
