@@ -292,3 +292,11 @@ Q12整项完成依据见[TASKS验收矩阵](TASKS.md#q12让诊断可理解可操
 `fix/vault-page-branding`只替换两个Vault标题、迁移说明、导入按钮/一次性读取说明和两个帮助标签中的产品词。两个候选字段插值与“只读一次、加密、验证目标Provider、清除明文租约”的说明保留。完整`MissionWorkbench.swift`对照main 467d0bd仅7行、8个品牌替换；确认/取消、端点审批、可用凭证检查、口令长度及二次确认、口令清空、Store调用和所有数据路径不变。既有导出建议名不再修改。
 
 交付时两项源码回归先行：旧版7条品牌失败、26条授权/口令断言通过，修改后33/33。另取实际七条显示表达式及现有产品名，以虚构候选字段在普通/ThreadSanitizer探针中核对完整显示文本，各7/7；这不是实际界面交互或凭证E2E。Swift应用构建、测试/脚本语法和Go Sandbox普通/race各107条无跳过；原63项macOS检查完整保留，加两项共65项，逐项passed并拒绝skip/空选。切片不再待审，Q06仍in_progress，真实剩余见TASKS，未顺带实现。
+
+### Mission 治理说明不是执行权限（2026-11-07）
+
+验收更新（2026-11-11）：34f892b完整差异经再次及独立只读复核，按授权保留历史合main。[分支CI42355719150](https://github.com/ggggggtm/ZoriDesk/actions/runs/42355719150)准确对应34f892b，原始日志核实Go普通/race各107条Sandbox、626条启动/Provider及macOS编译、67项XCTest通过，无跳过，合并提交CI单独核验。
+
+账号策略说明不代表产品独立认证Provider承诺；`endpointReviewPresentation`说明端点审批只记录精确目的地权限，不导入或发送凭证；权限模式仍只是提议，子运行先审零写入提案。`missionToolRecoveryConfirmationDetail`继续说明原ToolCall不重跑，备用路由须精确版本审批。`fix/mission-governance-copy`只在这7条固定显示文本中引用既有产品名，完整生产文件其余字节不变；确认/取消、审批回调、恢复动作、子运行提议/确认及结构化`requester`均未改，已有Vault和其他品牌切片不重复。
+
+先加`testMissionGovernanceCopyPreservesAuthorityDisclosures`和`testMissionGovernanceWiringPreservesApprovalRecoveryAndRequester`：旧源码7条品牌断言失败、19条接线检查通过，修改后同一测试体普通和ThreadSanitizer探针均26/26；实际7条显示表达式及现有产品枚举另各7/7，含虚构origin插值。探针是有限路径检查，不是本地正式XCTest、真实权限操作、GUI E2E或全应用无竞态证明。Swift构建、语法/脚本和Go Sandbox普通/race各107条无跳过；CI保留原65项并追加两项，共67项逐项要求passed、拒绝skip/空选。此切片不再待审，Q06余项另在新分支集中处理。
