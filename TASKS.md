@@ -24,7 +24,7 @@
 | Q03 | 贡献指南与反馈模板 | done | 2026-10-13 按维护者授权复核并合入 main；不改变 Issues 设置 |
 | Q04 | 架构、用户路径与源码导航 | in_progress | VERIFICATION.md 已补 Q05 的验证链路；完整用户路径仍未覆盖 |
 | Q05 | 无真实账号的测试基线与 CI | done | 2026-10-28 按授权复核 0b9e1ff 并合入 main；本地与分支 CI 普通/race 各 55 个事件通过，无跳过；限定 sandbox/testreport 基线 |
-| Q06 | 用户可见品牌统一 | in_progress | 桌面批次 d9e27bd 经明确授权复核合入main，分支CI42958216100通过；合并CI另验，备用路由组合提示及实际菜单验收仍待完成 |
+| Q06 | 用户可见品牌统一 | in_progress | `ba1e5c0`的预检修复经授权合入main，分支CI43830977594通过，合并CI另验；隔离原生菜单已验，Mission卡片/读屏及Outcome的已知阻塞理由仍待处理 |
 | Q07 | 安装与服务标识迁移 | backlog | Q05、Q06；与 Q08 联合设计 |
 | Q08 | 数据路径、凭证与兼容策略 | backlog | Q07/Q08 联合方案先评审 |
 | Q09 | 执行输出限制与回归测试 | done | 2026-10-28 按明确授权复核 b40a0fe 并合入 main；本地与分支 CI 普通/race 各 91 条记录通过无跳过，仅验收 Loopback 有界输出 |
@@ -97,6 +97,8 @@ Q01、Q02 为 2026-10-13 初始化文档交付；只代表维护文档，不代�
 
 ### Q06：统一用户可见品牌
 
+预检收尾验收（2026-11-16）：`fix/fallback-preflight-branding`的 `ba1e5c0` 经复核、按明确授权保留历史合main。只映射`Approved fallback is unavailable. `加已知旧理由的预检显示，不改Go、原始原因或审批。原测试体先红22/23、普通及ThreadSanitizer修后各23/23；[分支CI43830977594](https://github.com/ggggggtm/ZoriDesk/actions/runs/43830977594)普通/race及71项XCTest通过无跳过，合并CI独立核验。隔离原生菜单的旧/新对照和边界已实测，安装及完整GUI未验证。证据见[VERIFICATION.md](VERIFICATION.md#只映射组合提示与隔离原生菜单2026-11-16)。
+
 最新验收（2026-11-16）：`fix/desktop-branding-cleanup`的 d9e27bd 复核无合并阻断，按明确授权保留历史合main。四类展示先补回归，旧UI/Core与接线/元数据4/11、修后11/11；普通/ThreadSanitizer探针各146/146，Swift构建通过。[分支CI42958216100](https://github.com/ggggggtm/ZoriDesk/actions/runs/42958216100)准确对应 d9e27bd，Go普通/race各107条Sandbox、626条启动/Provider，macOS编译及71项XCTest全部通过，无跳过；合并CI独立核验。未重做已验收展示，也不改原始数据、审批或安装标识。
 
 最新验收（2026-11-11）：`fix/mission-governance-copy`的34f892b经再次及独立只读复核无阻断，按明确授权保留历史合main。只换7条固定治理说明中的产品词，结构化请求者及权限/审批/恢复逻辑不动。分支CI42355719150准确SHA与原始日志核实：Go普通/race各107条Sandbox、626条启动/Provider，macOS编译及67项XCTest通过，含两项新增、无跳过；合并CI另验。既有RED→GREEN及定向ThreadSanitizer证据保留，不重复实现，不宣称真实审批/恢复E2E已验。
@@ -121,12 +123,12 @@ Q01、Q02 为 2026-10-13 初始化文档交付；只代表维护文档，不代�
 
 | 本次合入的展示范围（非全部界面实测） | 位置与边界 |
 | --- | --- |
-| 远程工具兼容性预检 | Mission主/回退节点仅对已知兼容性旧理由精确映射显示。原`block_reason`/`fallback_block_reason`、其他理由、摘要及审批不变；不重复`invalid_response`已验收切片 |
+| 远程工具兼容性预检 | Mission主/回退节点仅对原句及已批准备用路由不可用的固定组合做精确展示映射。原`block_reason`/`fallback_block_reason`、其他理由、摘要及审批不变 |
 | 结构化请求者展示 | 只读Review Gate及已准备备用路由的两个已知固定标签在视图层映射，其他请求者原样展示；原`requester`、决策ID/摘要、权限和执行逻辑不变，不重复Mission七句 |
 | 工具形态安全警告正文 | 保留原Core过滤及Go固定回复；聊天显示、非用户读屏和复制统一呈现“ZoriDesk未执行”，含历史固定警告，原消息、用户原文和Mission目标草稿保持原样 |
-| 应用包显示名称 | `Resources/Info.plist`只改CFBundleDisplayName/CFBundleName；CI核对元数据并同步原包测试的名称断言，保留bundle ID、可执行文件、安装位置与服务标识。未运行会签名/启动的包测试，实际安装后菜单仍未验 |
+| 应用包显示名称 | `Resources/Info.plist`只改CFBundleDisplayName/CFBundleName；元数据检查和隔离原生菜单已验，保留bundle ID、可执行文件、安装位置与服务标识。未运行会签名或启动真实应用的包测试 |
 
-收尾待验：Go在已批准的备用路由变得不可用时会生成`Approved fallback is unavailable. `加原阻塞原因；包含已知旧兼容理由的组合是精确原句映射之外的实际源码路径，定向Swift探针确认其旧品牌仍可见。未触发真实旧配置；后续核对并单独覆盖该固定组合，不全局替换理由。另需在不会触碰旧安装、服务或数据的环境核对应用菜单；通过plist检查不等于实际菜单通过。两项未收尾前Q06保持in_progress。
+剩余真实展示遗漏：`TeamNodeInitiallyBlocked`携带的固定原因进入Mission摘要`block_reason`；卡片及无障碍标签、Outcome使用`missionHumanStatus`，未走已验收的预检显示映射。真实Go摘要构建与实际Swift Core/UI函数对无前缀和带已批准备用路由前缀的两条虚构原因均复现旧品牌。后续先补该出口回归，只映射两个已知理由，保留原字段、其他状态格式、审批和历史；不重复预检、菜单或包名。该出口合入并核验后再标done。
 
 不要机械替换协议角色`"loom"`、Harness ID `loom-native`、模块/服务/通知/环境变量、socket/数据库/Vault路径、来源版权或历史证据。`Loom Native`是可见的运行时名，Go的兼容校验也比对该名称，不当作应用品牌错误。`InteractionContinuity.primaryFlow`未发现生产引用，不列为活跃界面遗漏；继承的TUI不并入本次macOS盘点。后续仍按分支审查，不自动合main、不提前Q07/Q08迁移。
 

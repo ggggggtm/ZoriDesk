@@ -222,8 +222,9 @@ final class LoomGraphiteViewTests: XCTestCase {
     func testMissionPreflightBlockReasonBrandingIsExact() throws {
         let legacy = "Remote tool enrollment backend is not supported by this Loom build."
         let branded = "Remote tool enrollment backend is not supported by this ZoriDesk build."
+        let approvedFallbackUnavailable = "Approved fallback is unavailable. "
         let digest = String(repeating: "e", count: 64)
-        let fixture: [String: Any] = [
+        var fixture: [String: Any] = [
             "logical_node_id": "node-fixture", "title": "Agent", "role": "agent",
             "depends_on": [String](), "max_attempts": 1,
             "harness_adapter": "loom-native", "provider_id": "provider-fixture",
@@ -236,16 +237,29 @@ final class LoomGraphiteViewTests: XCTestCase {
             "remote_tool_enrollment_available": true, "remote_tool_enrollment_id": "enr-fixture",
             "remote_tool_backend_kind": "web_search", "remote_tool_binding_digest": digest,
         ]
-        let node = try JSONDecoder().decode(
-            LocalProductExecutionNodePreview.self,
-            from: JSONSerialization.data(withJSONObject: fixture)
-        )
-        XCTAssertEqual(missionPreflightBlockReasonText(node.blockReason), branded)
-        XCTAssertEqual(missionPreflightBlockReasonText(node.fallbackBlockReason), branded)
-        XCTAssertEqual(node.blockReason, legacy)
-        XCTAssertEqual(node.fallbackBlockReason, legacy)
-        XCTAssertEqual(node.remoteToolBindingDigest, digest)
-        for reason in ["", "Unsupported Loom fixture.", " " + legacy, legacy + " More detail."] {
+        for (wireReason, expectedDisplay) in [
+            (legacy, branded),
+            (approvedFallbackUnavailable + legacy, approvedFallbackUnavailable + branded),
+        ] {
+            fixture["block_reason"] = wireReason
+            let node = try JSONDecoder().decode(
+                LocalProductExecutionNodePreview.self,
+                from: JSONSerialization.data(withJSONObject: fixture)
+            )
+            XCTAssertEqual(missionPreflightBlockReasonText(node.blockReason), expectedDisplay)
+            XCTAssertEqual(missionPreflightBlockReasonText(node.fallbackBlockReason), branded)
+            XCTAssertEqual(node.blockReason, wireReason)
+            XCTAssertEqual(node.fallbackBlockReason, legacy)
+            XCTAssertEqual(node.remoteToolBindingDigest, digest)
+            XCTAssertTrue(node.fallbackApprovalRequired)
+            XCTAssertFalse(node.fallbackApprovalAvailable)
+        }
+        for reason in [
+            "", "Unsupported Loom fixture.", " " + legacy, legacy + " More detail.",
+            approvedFallbackUnavailable + "Credential is not configured. Reconnect this Provider Account.",
+            approvedFallbackUnavailable + legacy + " More detail.",
+            "Another route is unavailable. " + legacy,
+        ] {
             XCTAssertEqual(missionPreflightBlockReasonText(reason), reason)
         }
 

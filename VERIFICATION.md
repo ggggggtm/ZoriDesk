@@ -308,3 +308,15 @@ Q12整项完成依据见[TASKS验收矩阵](TASKS.md#q12让诊断可理解可操
 四项回归先于生产修改。实际旧UI/Core与接线/元数据探针4/11、仅7处展示失败，修改后同一检查11/11。八个新增及受影响的测试体通过断言适配器链接实际UI/Core，普通与ThreadSanitizer各146/146；真实Swift应用构建16.16秒，plist、测试语法、脚本及差异检查通过。本机CLT探针不是正式XCTest。
 
 2026-11-16按明确授权复核合入main。[分支CI42958216100](https://github.com/ggggggtm/ZoriDesk/actions/runs/42958216100)对应 d9e27bd，Go普通/race各107条Sandbox和626条启动/Provider，macOS编译与71项XCTest（原67项加4项）全部通过、无跳过；合并CI另行确认。未重跑不变的本地Go基线或会签名/启动的包测试；plist只改两个显示键，实际安装后菜单和完整GUI/模型/审批E2E均不宣称通过。备用路由组合原因的定向探针及下一步见[TASKS 的 Q06](TASKS.md#q06统一用户可见品牌)。
+
+### 只映射组合提示与隔离原生菜单（2026-11-16）
+
+后台在已批准备用路由不可用时给原原因加`Approved fallback is unavailable. `前缀。`missionPreflightBlockReasonText`在既有精确映射之外只识别这个前缀加完整旧兼容句，保持前缀及剩余内容。显示调用点、`block_reason`/`fallback_block_reason`、审批标记、摘要和回调仍用原值，不改后台或历史记录。
+
+扩展既有`testMissionPreflightBlockReasonBrandingIsExact`：正常、精确组合、带额外内容或不同前缀的原因，以及解码后原字段、审批标记和两个视图接线。用断言适配器链接真正的Core/UI运行测试体，旧版22/23、仅组合期望失败；修后普通和ThreadSanitizer各23/23。Swift应用构建通过，本机缺XCTest模块，正式运行以分支CI为准；原71项选择不变，本地Go普通/race各107条Sandbox及626条启动/Provider无跳过。
+
+菜单实测不是元数据推断。macOS 15.6.1使用两份临时`Loom.app`（保留可执行文件名、原窗口和命令声明），空工作区替代生产视图，只有AppKit/SwiftUI等系统框架，不连接本地服务。分别拷贝`dc0fef2`的旧显示名与当前Info.plist，临时包使用不同的测试标识，不改仓库plist。直接启动各自临时可执行文件，空环境配临时目录、禁用网络和真实应用数据路径、禁止目录外写入；虚构文件验证目录内可写、目录外不可读写。`NSApplication.mainMenu`实读：对照`Loom`、当前`ZoriDesk`，`About`、`Hide`、`Quit`均随应用名显示，原`Open Folder...`及快捷键保留。未启动、签名或安装真实包，未改现有服务或数据；这不是完整安装、审批或模型E2E。
+
+复核后按维护者授权保留历史合入`ba1e5c0`。复阅[分支CI43830977594](https://github.com/ggggggtm/ZoriDesk/actions/runs/43830977594)原始日志：Go普通/race各107条Sandbox和626条启动/Provider，macOS编译与71项XCTest（包含扩展的预检回归）全过、无跳过。合并CI独立验证；不重复既有隔离菜单或本地基线。
+
+验收复核新增一条只读探针：实际`buildLocalProductMission`从两条虚构已阻塞投影生成摘要，链接现有Swift Core/UI解码并调用实际格式化函数。无前缀与已批准备用路由组合的预检输出均为ZoriDesk；Mission摘要经过卡片、读屏及Outcome所用的`missionHumanStatus`仍为Loom。这是原有的独立投影展示路径，不是权限或执行失败，也没有启动真实任务。本轮只合入预检修复，不重写历史；Q06待该展示路径验收后完成。
