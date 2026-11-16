@@ -25,8 +25,8 @@
 | Q04 | 架构、用户路径与源码导航 | in_progress | VERIFICATION.md 已补 Q05 的验证链路；完整用户路径仍未覆盖 |
 | Q05 | 无真实账号的测试基线与 CI | done | 2026-10-28 按授权复核 0b9e1ff 并合入 main；本地与分支 CI 普通/race 各 55 个事件通过，无跳过；限定 sandbox/testreport 基线 |
 | Q06 | 用户可见品牌统一 | done | 2026-11-16：隔离原生菜单已验，Mission摘要收尾合入main `68e6ce2`；[合并CI43842215266](https://github.com/ggggggtm/ZoriDesk/actions/runs/43842215266)普通/race及72项XCTest通过，无跳过 |
-| Q07 | 安装与服务标识迁移 | backlog | Q05、Q06；与 Q08 联合设计 |
-| Q08 | 数据路径、凭证与兼容策略 | backlog | Q07/Q08 联合方案先评审 |
+| Q07 | 安装与服务标识迁移 | review | 仅 [Q07/Q08 联合方案](docs/adr/0023-zoridesk-side-by-side-installation.md)待评审；未改安装/服务 |
+| Q08 | 数据路径、凭证与兼容策略 | review | 同一方案待评审；未实现新路径或导入，不动真实数据 |
 | Q09 | 执行输出限制与回归测试 | done | 2026-10-28 按明确授权复核 b40a0fe 并合入 main；本地与分支 CI 普通/race 各 91 条记录通过无跳过，仅验收 Loopback 有界输出 |
 | Q10 | 取消、超时与资源回收 | done | 2026-10-29 对照下方矩阵确认既定范围已覆盖；main 98181f6 与 CI40870981799，普通/race各107条无跳过 |
 | Q11 | 可选运行工具与启动解耦 | done | 2026-10-30按明确授权复核3516dad并合入main；CI40996224960启动普通/race各449条、Sandbox各107条、macOS六项通过无跳过；合并CI另行确认 |
@@ -143,6 +143,8 @@ Q01、Q02 为 2026-10-13 初始化文档交付；只代表维护文档，不代�
 ### Q07 + Q08：安装标识与数据兼容
 
 这两项先做共同方案，再拆小实现；不要求彼此先完成，避免循环依赖。
+
+2026-11-16：`docs/side-by-side-installation` 基于 `fc09c8f` 提交[联合方案](docs/adr/0023-zoridesk-side-by-side-installation.md)。确认界面/服务共享旧 socket，另有生产激活配置路径和凭证候选发现。现状 8 项 Go 测试普通/race 均通过，无跳过；两份 plist 语法通过，分支 CI 另验。先评审身份和导入边界，再做虚构路径契约与回归；保持 `main` 和真实安装/数据不变。
 
 - Q07 盘点 bundle ID、服务名、launch agent、安装/构建脚本和卸载范围；不得覆盖现有 Loom 安装。
 - Q08 盘点数据库、配置、日志、socket、凭证存储 namespace；新旧实例数据分离。
