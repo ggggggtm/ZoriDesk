@@ -1791,6 +1791,21 @@ func missionHumanStatus(_ value: String) -> String {
   value.replacingOccurrences(of: "_", with: " ").capitalized
 }
 
+func missionSummaryBlockReasonText(
+  _ reason: String,
+  trimmingWhitespace: Bool = false
+) -> String {
+  let branded = missionPreflightBlockReasonText(reason)
+  let value = trimmingWhitespace
+    ? branded.trimmingCharacters(in: .whitespacesAndNewlines)
+    : branded
+  let display = missionHumanStatus(value)
+  guard branded != reason else { return display }
+  // Preserve the summary's title casing without lowercasing the D in ZoriDesk.
+  let productName = LocalProductCopy.productName
+  return display.replacingOccurrences(of: missionHumanStatus(productName), with: productName)
+}
+
 func missionPlanSummary(
   nodeCount: Int,
   completedNodeCount: Int,
@@ -4382,8 +4397,9 @@ public struct MissionWorkbench: View {
         if let blockReason = record?.blockReason,
            !blockReason.isEmpty,
            ["blocked", "failed"].contains(mission.status) {
+          let displayReason = missionSummaryBlockReasonText(blockReason)
           Label(
-            missionHumanStatus(blockReason),
+            displayReason,
             systemImage: "exclamationmark.triangle"
           )
           .font(.caption2)
@@ -4391,7 +4407,7 @@ public struct MissionWorkbench: View {
           .lineLimit(2)
           .fixedSize(horizontal: false, vertical: true)
           .accessibilityLabel(
-            "Mission failure reason: \(missionHumanStatus(blockReason))"
+            "Mission failure reason: \(displayReason)"
           )
         }
         if let record {
@@ -5436,8 +5452,8 @@ public struct MissionWorkbench: View {
   ) -> some View {
     let milestone = record?.lastMilestone
       ?? "No authoritative Mission record is available."
-    let reason = (record?.blockReason ?? "")
-      .trimmingCharacters(in: .whitespacesAndNewlines)
+    let reason = record?.blockReason ?? ""
+    let hasReason = !reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     let needsReason =
       record?.status == "blocked" || record?.status == "failed"
     return VStack(alignment: .leading, spacing: 8) {
@@ -5446,9 +5462,9 @@ public struct MissionWorkbench: View {
       Text(milestone)
         .foregroundStyle(.secondary)
         .textSelection(.enabled)
-      if needsReason, !reason.isEmpty {
+      if needsReason, hasReason {
         Label(
-          missionHumanStatus(reason),
+          missionSummaryBlockReasonText(reason, trimmingWhitespace: true),
           systemImage: "exclamationmark.triangle"
         )
         .font(.callout.weight(.medium))

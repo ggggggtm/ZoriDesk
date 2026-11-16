@@ -273,6 +273,72 @@ final class LoomGraphiteViewTests: XCTestCase {
         XCTAssertTrue(source.contains("Text(missionPreflightBlockReasonText(node.fallbackBlockReason))"))
     }
 
+    func testMissionSummaryBlockReasonBrandingIsExact() throws {
+        let legacy = "Remote tool enrollment backend is not supported by this Loom build."
+        let fallbackPrefix = "Approved fallback is unavailable. "
+        let branded = "Remote Tool Enrollment Backend Is Not Supported By This ZoriDesk Build."
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+
+        for (wireReason, expected) in [
+            (legacy, branded),
+            (fallbackPrefix + legacy, "Approved Fallback Is Unavailable. " + branded),
+        ] {
+            let fixture = LocalProductMissionSummary(
+                missionID: "mission/team-fixture", teamInstanceID: "team-fixture",
+                title: "Mission fixture", sourceKind: "historical_execution_only",
+                lane: "Orchestrating", status: "blocked", priority: "normal",
+                planDigest: String(repeating: "f", count: 64), simple: true, nodeCount: 1,
+                completedNodeCount: 0, activeNodeCount: 0, reviewNodeCount: 0,
+                attentionCount: 0, currentNodeID: "main", lastMilestone: "Blocked",
+                blockReason: wireReason, teamPulse: [], topology: []
+            )
+            let original = try encoder.encode(fixture)
+            let record = try JSONDecoder().decode(LocalProductMissionSummary.self, from: original)
+            let reason = try XCTUnwrap(record.blockReason)
+
+            XCTAssertEqual(missionSummaryBlockReasonText(reason), expected)
+            XCTAssertEqual(missionSummaryBlockReasonText(reason, trimmingWhitespace: true), expected)
+            XCTAssertEqual(record.blockReason, wireReason)
+            XCTAssertEqual(try encoder.encode(record), original)
+        }
+
+        let otherReasons = [
+            "", " \n ", "permission_denied", " \n_runtime_offline_ ",
+            "Loom fixture is unavailable.", " " + legacy + " ",
+            legacy + " Additional detail.", fallbackPrefix + legacy + " Additional detail.",
+            "Another route is unavailable. " + legacy,
+        ]
+        for reason in otherReasons {
+            XCTAssertEqual(missionSummaryBlockReasonText(reason), missionHumanStatus(reason))
+            XCTAssertEqual(
+                missionSummaryBlockReasonText(reason, trimmingWhitespace: true),
+                missionHumanStatus(reason.trimmingCharacters(in: .whitespacesAndNewlines))
+            )
+        }
+
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/LoomLocalAppUI/MissionWorkbench.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+        func viewBody(_ name: String) throws -> String {
+            let start = try XCTUnwrap(source.range(of: "\n  private func \(name)("))
+            let end = try XCTUnwrap(source.range(
+                of: "\n  private func ",
+                range: start.upperBound..<source.endIndex
+            ))
+            return String(source[start.lowerBound..<end.lowerBound])
+        }
+        let card = try viewBody("missionCard")
+        XCTAssertTrue(card.contains("let displayReason = missionSummaryBlockReasonText(blockReason)"))
+        XCTAssertTrue(card.contains("Label(\n            displayReason,"))
+        XCTAssertTrue(card.contains(#""Mission failure reason: \(displayReason)""#))
+        let outcome = try viewBody("missionOutcomeBlock")
+        XCTAssertTrue(outcome.contains("missionSummaryBlockReasonText(reason, trimmingWhitespace: true)"))
+    }
+
     func testDesktopBundleDisplayNamesPreserveBundleIdentity() throws {
         let infoURL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

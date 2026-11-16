@@ -320,3 +320,9 @@ Q12整项完成依据见[TASKS验收矩阵](TASKS.md#q12让诊断可理解可操
 复核后按维护者授权保留历史合入`ba1e5c0`。复阅[分支CI43830977594](https://github.com/ggggggtm/ZoriDesk/actions/runs/43830977594)原始日志：Go普通/race各107条Sandbox和626条启动/Provider，macOS编译与71项XCTest（包含扩展的预检回归）全过、无跳过。合并CI独立验证；不重复既有隔离菜单或本地基线。
 
 验收复核新增一条只读探针：实际`buildLocalProductMission`从两条虚构已阻塞投影生成摘要，链接现有Swift Core/UI解码并调用实际格式化函数。无前缀与已批准备用路由组合的预检输出均为ZoriDesk；Mission摘要经过卡片、读屏及Outcome所用的`missionHumanStatus`仍为Loom。这是原有的独立投影展示路径，不是权限或执行失败，也没有启动真实任务。本轮只合入预检修复，不重写历史；Q06待该展示路径验收后完成。
+
+### Mission 摘要只改显示（2026-11-16）
+
+`block_reason`原样进入Swift摘要。新增`missionSummaryBlockReasonText`只在卡片、读屏标签和Outcome复用预检已验的精确匹配：原句和已批准备用路由的固定组合替换品牌；其余字词保留既有标题格式，ZoriDesk保留正确大小写。未命中原样走旧格式，Outcome仍先去首尾空白且空理由不显示。原始记录、序列化、审批、预检和菜单不变。
+
+先加`testMissionSummaryBlockReasonBrandingIsExact`：两个理由、原摘要往返、九种其他提示与空白/格式、三处显示接线。断言适配器链接实际Core/UI、按旧接线调用原格式函数，旧版28/36（四条品牌及四条接线预期失败）；修后普通与ThreadSanitizer各36/36。Swift应用构建、本地Go普通/race各107条Sandbox与626条启动/Provider无跳过。原71项CI门禁保留、加一项共72项，正式XCTest以CI为准。未启动真实任务/VoiceOver，不重复菜单实测，也不宣称安装、模型或全仓E2E。分支待审，未合main。

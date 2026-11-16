@@ -56,6 +56,7 @@ brand_tests=(
   testMissionGovernanceWiringPreservesApprovalRecoveryAndRequester
   testMissionDecisionRequesterDisplayPreservesAuthorityData
   testMissionPreflightBlockReasonBrandingIsExact
+  testMissionSummaryBlockReasonBrandingIsExact
   testDesktopBundleDisplayNamesPreserveBundleIdentity
 )
 brand_filter=$(IFS='|'; echo "${brand_tests[*]}")
