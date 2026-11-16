@@ -54,12 +54,16 @@ brand_tests=(
   testVaultImportAuthorizationAndPassphraseWiringUnchanged
   testMissionGovernanceCopyPreservesAuthorityDisclosures
   testMissionGovernanceWiringPreservesApprovalRecoveryAndRequester
+  testMissionDecisionRequesterDisplayPreservesAuthorityData
+  testMissionPreflightBlockReasonBrandingIsExact
+  testDesktopBundleDisplayNamesPreserveBundleIdentity
 )
 brand_filter=$(IFS='|'; echo "${brand_tests[*]}")
 chat_state_tests=(
   testChatBrandCopyUsesProductName
   testChatMessagePresentationPreservesRolesAndContent
   testChatTranscriptPreservesUnicodeAndWireRoles
+  testDesktopToolWarningPreservesMessageAndObjective
   testConversationTranscriptTextBuildsReadableCopyableThread
   testConversationComposerActionBecomesAccessibleStopWhileResponding
 )

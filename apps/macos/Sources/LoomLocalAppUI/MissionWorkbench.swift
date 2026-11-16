@@ -54,6 +54,13 @@ func missionHistoryIncludesMission(
   return !(hideCompleted && lane == .complete)
 }
 
+func missionPreflightBlockReasonText(_ reason: String) -> String {
+  // The wire reason still belongs to the preflight bound to the command.
+  guard reason == "Remote tool enrollment backend is not supported by this Loom build."
+  else { return reason }
+  return "Remote tool enrollment backend is not supported by this \(LocalProductCopy.productName) build."
+}
+
 func missionRuntimeRecoveryReason(
   hasExecutableTeam: Bool,
   executionReachable: Bool,
@@ -3876,7 +3883,7 @@ public struct MissionWorkbench: View {
 			.font(.caption2)
 			.foregroundStyle(.secondary)
 		  if !node.fallbackBlockReason.isEmpty {
-			Text(node.fallbackBlockReason)
+			Text(missionPreflightBlockReasonText(node.fallbackBlockReason))
 			  .font(.caption2)
 			  .foregroundStyle(.orange)
 			  .lineLimit(2)
@@ -3884,7 +3891,7 @@ public struct MissionWorkbench: View {
 		}
 
         if !node.blockReason.isEmpty {
-          Text(node.blockReason)
+          Text(missionPreflightBlockReasonText(node.blockReason))
             .font(.caption)
             .foregroundStyle(.orange)
             .lineLimit(2)
@@ -7520,6 +7527,23 @@ public struct MissionWorkbench: View {
   }
 }
 
+func missionDecisionRequesterLabel(_ sheet: LocalProductDecisionSheet) -> String {
+  // Recognize the fixed labels of the two known producers at the view boundary.
+  // The sheet, prepared actions and decision digest remain the source of truth.
+  guard sheet.schemaVersion == 1 else { return sheet.requester }
+  if sheet.kind == .review, !sheet.prepared, sheet.permissionScope == "read-only",
+     sheet.decisionID == "unprepared-review-\(sheet.missionID)",
+     sheet.requester == "Loom authority" {
+    return "\(LocalProductCopy.productName) authority"
+  }
+  if sheet.kind == .fallback, sheet.prepared, !sheet.decisionDigest.isEmpty,
+     sheet.decisionID.hasPrefix("fallback-"), sheet.decisionID.count > "fallback-".count,
+     sheet.requester == "Loom" {
+    return LocalProductCopy.productName
+  }
+  return sheet.requester
+}
+
 public struct LoomDecisionSheet: View {
   public let sheet: LocalProductDecisionSheet
   public let onAction: (String) -> Void
@@ -7604,7 +7628,7 @@ public struct LoomDecisionSheet: View {
   private var identitySection: some View {
     VStack(alignment: .leading, spacing: 10) {
       decisionRow("Mission", "Current Mission")
-      decisionRow("Requested by", sheet.requester)
+      decisionRow("Requested by", missionDecisionRequesterLabel(sheet))
       decisionRow("Target", sheet.target)
       decisionRow("Attempt", sheet.attemptScope)
     }

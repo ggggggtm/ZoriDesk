@@ -38,15 +38,25 @@ func conversationSpeakerLabel(for role: String) -> String {
     }
 }
 
+func conversationMessageDisplayText(_ message: LocalProductChatMessage) -> String {
+    let content = message.displayContent
+    // Keep Core's filtering and Mission objective inputs unchanged. Only brand
+    // the filtered result or an exact legacy warning from a tentative reply.
+    guard message.tentative, content == LocalProductChatMessage.toolShapedWarning,
+          content != message.content || message.role == "loom" || message.role == "proposal"
+    else { return content }
+    return "The conversation runtime returned tool-shaped text. \(LocalProductCopy.productName) did not execute it."
+}
+
 func conversationMessageAccessibilityLabel(_ message: LocalProductChatMessage) -> String {
     let speaker = conversationSpeakerLabel(for: message.role)
     if message.role == "user" {
         return "\(speaker): \(message.content)"
     }
     if message.role == "proposal" {
-        return "\(speaker), untrusted: \(message.displayContent)"
+        return "\(speaker), untrusted: \(conversationMessageDisplayText(message))"
     }
-    return "\(speaker): \(message.displayContent)"
+    return "\(speaker): \(conversationMessageDisplayText(message))"
 }
 
 struct ConversationComposerActionPresentation: Equatable {
@@ -1576,20 +1586,20 @@ public struct LoomWorkspaceShell: View {
                             .foregroundStyle(.secondary)
                         }
                         HStack(alignment: .top, spacing: 6) {
-                            Text(message.displayContent)
+                            Text(conversationMessageDisplayText(message))
                                 .font(.body)
                                 .foregroundStyle(isAgentProposal ? Color.secondary : Color.primary)
                                 .textSelection(.enabled)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .contextMenu {
                                     Button {
-                                        copyChatMessage(message.displayContent)
+                                        copyChatMessage(conversationMessageDisplayText(message))
                                     } label: {
                                         Label("Copy", systemImage: "doc.on.doc")
                                     }
                                 }
                             Button {
-                                copyChatMessage(message.displayContent)
+                                copyChatMessage(conversationMessageDisplayText(message))
                             } label: {
                                 Image(systemName: "doc.on.doc")
                                     .font(.caption2)
@@ -3935,7 +3945,7 @@ func runtimeAvailabilityAccessibilityLabel(
 func conversationTranscriptText(_ messages: [LocalProductChatMessage]) -> String {
     let parts = messages.map { message -> String in
         let speaker = conversationSpeakerLabel(for: message.role)
-        return "\(speaker): \(message.displayContent)"
+        return "\(speaker): \(conversationMessageDisplayText(message))"
     }
     return parts.joined(separator: "\n\n")
 }

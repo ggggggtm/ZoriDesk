@@ -115,7 +115,8 @@ do
   test "$(stat -f '%Lp' "$bundle/Contents/Library/LaunchAgents/com.earendilworks.loom.local.daemon.plist")" = 600
   test "$(stat -f '%Lp' "$bundle/Contents/Info.plist")" = 600
   test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$bundle/Contents/Info.plist")" = com.earendilworks.loom.local
-  test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleName' "$bundle/Contents/Info.plist")" = Loom
+  test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleName' "$bundle/Contents/Info.plist")" = ZoriDesk
+  test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$bundle/Contents/Info.plist")" = ZoriDesk
   /usr/bin/codesign --verify --strict "$bundle"
   /usr/bin/lipo -archs "$bundle/Contents/MacOS/LoomLocalApp" |
     grep -Eq '(^| )arm64( |$)'
