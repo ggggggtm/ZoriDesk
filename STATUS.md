@@ -17,8 +17,8 @@
 | 公开仓库初始化 | 已完成；2026-11-02通过GitHub原生操作脱离Fork网络，地址/ID、12分支SHA及320个可达提交未变，必要来源与许可保留 |
 | 项目介绍 | 已发布 README，提交 510fdc956d74e533eb6b43551e1fffc3d10d24ef |
 | 运行时代码 | Provider凭证回显修复dcc3aa6经再次完整及独立复核，按维护者授权保留历史合入main；Q12按下方既定有界验收关闭，不代表全应用安全审计完成 |
-| 构建、测试、端到端验证 | 桌面展示 d9e27bd 的[分支CI42958216100](https://github.com/ggggggtm/ZoriDesk/actions/runs/42958216100)通过：Go普通/race启动与Provider各626条、Sandbox各107条，macOS编译及71项XCTest，无跳过。合并提交CI单独核验。未验证安装后菜单、完整GUI、模型E2E及全仓 |
-| 应用与服务内部名称 | 窗口/聊天/连接、故障/治理说明、导出建议名和Vault页面等已验收。警告、请求者、两处预检显示与包显示名经复核和明确授权合入 main；不改兼容标识。Q06仍in_progress，备用路由组合提示及实际菜单验收待收尾 |
+| 构建、测试、端到端验证 | main 2549851 的[合并CI43828163896](https://github.com/ggggggtm/ZoriDesk/actions/runs/43828163896)通过：Go普通/race各107条Sandbox和626条启动/Provider，macOS编译及71项XCTest，无跳过。收尾分支本地普通/race、Swift构建、定向探针和隔离菜单通过；分支CI另核验。完整安装、GUI/模型E2E及全仓未验证 |
+| 应用与服务内部名称 | 既有窗口、聊天、故障/治理、Vault和包显示名已合入 main。最后一条备用路由组合提示仅改显示，AppKit原生菜单在隔离临时包中验证；Q06收尾`review`，未合入main，不动安装或服务标识 |
 | 本地开发与提交环境 | 已建立独立 checkout；SSH 认证到正确所有者，仓库级个人提交身份已配置；Q00 记录已真实推送并核对远端 SHA |
 | Docker / Kubernetes 后端 | 后续规划，不能写成已交付能力 |
 | 发布版本 | 尚未发布 ZoriDesk 版本 |
@@ -34,7 +34,7 @@
 ## 下一步
 
 1. Q00、Q03 经复核并按维护者明确授权合入 main，状态 done；不重复初始化或创建模板。此授权仅针对这两个任务，不改变以后定时维护的分支审查规则。
-2. Q12保持done。单独核验桌面展示批次的合并CI；后续Q06只追踪源码已确认的备用路由组合提示、及隔离的实际应用菜单检查，不重复已合入的展示，也不提前Q07/Q08迁移或自动合main。
+2. Q12保持done。先核验`fix/fallback-preflight-branding`分支CI及审查反馈；已验的显示和菜单检查不重复。Q06合入并验收前不提前Q07/Q08迁移，不自动合main。
 3. Q04 随代码和测试同步补充真实路径与关键函数，不阻塞 Q05/Q09；品牌与兼容性任务后置，原有验收、安全边界和分支审查规则保持不变。
 4. 执行前检查实际分支、未提交改动和待审查工作；有未完成任务先收尾，不机械开始新任务。
 
@@ -408,7 +408,13 @@ git diff --exit-code -- go.mod go.sum
 - `fix/desktop-branding-cleanup`基于main dc0fef2。聊天警告仅在显示、读屏和复制出口换品牌；Mission请求者仅映射两类已知来源的固定标签，兼容预检仅映射主/回退节点的同一精确旧理由；Info.plist仅改两个显示名。原始消息、草稿、结构化请求者、摘要、权限、审批与安装标识不动。
 - 四项回归先行。实际编译的旧UI/Core与源码/元数据混合检查4/11通过、7处目标展示失败；修改后同一检查11/11。八个新增及受影响的测试体链接实际UI/Core，普通和ThreadSanitizer各146/146；Swift应用构建、plist及脚本/Swift语法检查通过。未启动、签名或安装应用，未验证真实菜单、模型/审批E2E。
 - 2026-11-16：复核 `dc0fef2..d9e27bd` 无合并阻断，按明确授权保留分支历史合入 main。分支CI实跑原67项加4项，共71项XCTest；Go普通/race各107条Sandbox与626条启动/Provider均通过无跳过。额外核对仅两个plist显示键改变，既有测试未删除；不重复跑本地相同基线。
-- Q06暂不标done：`missionPreflightBlockReasonText`会映射精确旧理由；Go已批准备用路由不可用路径会在相同理由前加固定前缀，定向Swift探针证实该组合仍显示旧产品名。未复现真实旧配置；后续仅覆盖已知的组合及实际显示入口，保留原字段。包元数据已验证，系统菜单仍待隔离实测。
+- 合并时未关闭Q06：Go已批准备用路由不可用路径会在精确旧理由前加固定前缀，定向Swift探针证实组合仍显示旧产品名；包元数据已验证，系统菜单需隔离验证。两项收尾见下节。
+
+## Q06 组合提示与隔离菜单收尾（2026-11-16）
+
+- `fix/fallback-preflight-branding`基于main `2549851`。`missionPreflightBlockReasonText`仅新增一个固定组合的展示映射；前缀、原始原因、绑定摘要、审批状态和动作不变。此前已经合入的文字、元数据和安装流程未改。
+- 先扩展原`testMissionPreflightBlockReasonBrandingIsExact`，链接实际Core/UI的测试体旧版22/23、仅新文案失败；修后普通及ThreadSanitizer各23/23。Swift应用编译通过。本机Command Line Tools没有XCTest模块，探针不是正式XCTest；原71项CI测试选择不变。离线Go普通/race各107条Sandbox、626条启动/Provider，无跳过。
+- macOS 15.6.1实际启动临时SwiftUI包并读取AppKit菜单。保留真实窗口/命令及打包名称，替换工作区内容，不链接产品模块或服务；使用临时身份与目录，禁用联网，应用数据路径不可读、目录外不可写，并以独立虚构文件验证边界。旧包对照显示Loom，当前显示`ZoriDesk`及`About/Hide/Quit ZoriDesk`，保留`Open Folder…`快捷键。未签名、安装或启动真实应用，未触碰其服务、凭证或数据；非完整安装或GUI E2E。分支待CI与审查，不合main。
 
 ## 状态维护约定
 

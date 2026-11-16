@@ -56,9 +56,17 @@ func missionHistoryIncludesMission(
 
 func missionPreflightBlockReasonText(_ reason: String) -> String {
   // The wire reason still belongs to the preflight bound to the command.
-  guard reason == "Remote tool enrollment backend is not supported by this Loom build."
-  else { return reason }
-  return "Remote tool enrollment backend is not supported by this \(LocalProductCopy.productName) build."
+  let legacy = "Remote tool enrollment backend is not supported by this Loom build."
+  let branded = "Remote tool enrollment backend is not supported by this \(LocalProductCopy.productName) build."
+  let approvedFallbackUnavailable = "Approved fallback is unavailable. "
+  switch reason {
+  case legacy:
+    return branded
+  case approvedFallbackUnavailable + legacy:
+    return approvedFallbackUnavailable + branded
+  default:
+    return reason
+  }
 }
 
 func missionRuntimeRecoveryReason(
