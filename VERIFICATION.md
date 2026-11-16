@@ -323,6 +323,8 @@ Q12整项完成依据见[TASKS验收矩阵](TASKS.md#q12让诊断可理解可操
 
 ### Mission 摘要只改显示（2026-11-16）
 
-`block_reason`原样进入Swift摘要。新增`missionSummaryBlockReasonText`只在卡片、读屏标签和Outcome复用预检已验的精确匹配：原句和已批准备用路由的固定组合替换品牌；其余字词保留既有标题格式，ZoriDesk保留正确大小写。未命中原样走旧格式，Outcome仍先去首尾空白且空理由不显示。原始记录、序列化、审批、预检和菜单不变。
+`block_reason`原样进入Swift摘要。`missionSummaryBlockReasonText`只在卡片、读屏标签和Outcome复用预检已验的精确匹配：原句和已批准备用路由的固定组合替换品牌；其余字词保留既有标题格式，ZoriDesk保留正确大小写。匹配用原始理由；Outcome仍在判空和显示时去首尾空白。未命中沿用旧格式，原始记录、序列化、审批、预检和菜单不变。
 
-先加`testMissionSummaryBlockReasonBrandingIsExact`：两个理由、原摘要往返、九种其他提示与空白/格式、三处显示接线。断言适配器链接实际Core/UI、按旧接线调用原格式函数，旧版28/36（四条品牌及四条接线预期失败）；修后普通与ThreadSanitizer各36/36。Swift应用构建、本地Go普通/race各107条Sandbox与626条启动/Provider无跳过。原71项CI门禁保留、加一项共72项，正式XCTest以CI为准。未启动真实任务/VoiceOver，不重复菜单实测，也不宣称安装、模型或全仓E2E。分支待审，未合main。
+先加`testMissionSummaryBlockReasonBrandingIsExact`：两个理由、原摘要往返、九种其他提示与空白/格式、三处显示接线。断言适配器链接实际Core/UI、按旧接线调用原格式函数，旧版28/36（四条品牌及四条接线预期失败）；修后普通与ThreadSanitizer各36/36。Swift应用构建、本地Go普通/race各107条Sandbox与626条启动/Provider无跳过。未启动真实任务/VoiceOver，不重复菜单实测，也不宣称安装、模型或全仓E2E。
+
+`379a564`的[分支CI43840277248](https://github.com/ggggggtm/ZoriDesk/actions/runs/43840277248)通过后，复核并按明确授权保留历史合入main `68e6ce2`。该提交自己的[合并CI43842215266](https://github.com/ggggggtm/ZoriDesk/actions/runs/43842215266)原始日志确认：Linux普通/race各107条Sandbox及626条启动/Provider记录；macOS应用编译成功，原71项加摘要回归共72项XCTest通过，无跳过。这是Q06收尾验收，不改变已验菜单范围或安装/迁移标识。

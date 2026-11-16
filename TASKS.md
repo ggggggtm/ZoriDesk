@@ -24,7 +24,7 @@
 | Q03 | 贡献指南与反馈模板 | done | 2026-10-13 按维护者授权复核并合入 main；不改变 Issues 设置 |
 | Q04 | 架构、用户路径与源码导航 | in_progress | VERIFICATION.md 已补 Q05 的验证链路；完整用户路径仍未覆盖 |
 | Q05 | 无真实账号的测试基线与 CI | done | 2026-10-28 按授权复核 0b9e1ff 并合入 main；本地与分支 CI 普通/race 各 55 个事件通过，无跳过；限定 sandbox/testreport 基线 |
-| Q06 | 用户可见品牌统一 | review | 预检已合main `e2f55e3`、CI43837953022通过，隔离原生菜单已验；Mission摘要收尾在`fix/mission-summary-branding`本地普通/race及定向检查通过，待分支CI和审查，未合main |
+| Q06 | 用户可见品牌统一 | done | 2026-11-16：隔离原生菜单已验，Mission摘要收尾合入main `68e6ce2`；[合并CI43842215266](https://github.com/ggggggtm/ZoriDesk/actions/runs/43842215266)普通/race及72项XCTest通过，无跳过 |
 | Q07 | 安装与服务标识迁移 | backlog | Q05、Q06；与 Q08 联合设计 |
 | Q08 | 数据路径、凭证与兼容策略 | backlog | Q07/Q08 联合方案先评审 |
 | Q09 | 执行输出限制与回归测试 | done | 2026-10-28 按明确授权复核 b40a0fe 并合入 main；本地与分支 CI 普通/race 各 91 条记录通过无跳过，仅验收 Loopback 有界输出 |
@@ -97,7 +97,9 @@ Q01、Q02 为 2026-10-13 初始化文档交付；只代表维护文档，不代�
 
 ### Q06：统一用户可见品牌
 
-摘要收尾待审（2026-11-16）：`fix/mission-summary-branding`基于`e2f55e3`，仅在卡片、读屏标签与Outcome显示两条已确认理由的ZoriDesk品牌，原字段/审批/历史及其他提示不变。回归先红28/36、修后普通与ThreadSanitizer各36/36；Swift应用构建和Go普通/race通过。原71项macOS门禁保留，加一项；分支CI待验、不自动合main。此次不启动真实VoiceOver或重做预检和菜单。详见[验证记录](VERIFICATION.md#mission-摘要只改显示2026-11-16)。
+摘要收尾验收（2026-11-16）：`fix/mission-summary-branding` 的 `379a564` 经复核按明确授权保留历史合入main `68e6ce2`。只在卡片、读屏标签与结果页转换两条固定理由，原字段、审批、历史及其他提示不变。[独立合并CI43842215266](https://github.com/ggggggtm/ZoriDesk/actions/runs/43842215266)的Go普通/race、macOS构建及72项XCTest全部通过，无跳过。定向回归见[验证记录](VERIFICATION.md#mission-摘要只改显示2026-11-16)；未重做预检与菜单。
+
+整项验收：窗口及侧栏有离屏渲染，原生菜单有[隔离实测](VERIFICATION.md#只映射组合提示与隔离原生菜单2026-11-16)，设置、聊天、错误与Mission提示有显示回归和构建证据。复核了当前应用的旧名用法，已知兼容标识、原始记录和来源版权保持原样。Q06关闭；未验真实安装、全桌面/VoiceOver或模型E2E。
 
 预检收尾验收（2026-11-16）：`fix/fallback-preflight-branding`的 `ba1e5c0` 经复核、按明确授权保留历史合main。只映射`Approved fallback is unavailable. `加已知旧理由的预检显示，不改Go、原始原因或审批。原测试体先红22/23、普通及ThreadSanitizer修后各23/23；[分支CI43830977594](https://github.com/ggggggtm/ZoriDesk/actions/runs/43830977594)普通/race及71项XCTest通过无跳过，合并CI独立核验。隔离原生菜单的旧/新对照和边界已实测，安装及完整GUI未验证。证据见[VERIFICATION.md](VERIFICATION.md#只映射组合提示与隔离原生菜单2026-11-16)。
 
@@ -130,7 +132,7 @@ Q01、Q02 为 2026-10-13 初始化文档交付；只代表维护文档，不代�
 | 工具形态安全警告正文 | 保留原Core过滤及Go固定回复；聊天显示、非用户读屏和复制统一呈现“ZoriDesk未执行”，含历史固定警告，原消息、用户原文和Mission目标草稿保持原样 |
 | 应用包显示名称 | `Resources/Info.plist`只改CFBundleDisplayName/CFBundleName；元数据检查和隔离原生菜单已验，保留bundle ID、可执行文件、安装位置与服务标识。未运行会签名或启动真实应用的包测试 |
 
-摘要显示边界：`TeamNodeInitiallyBlocked`的两种固定原因经`block_reason`进入摘要；此次只在三处显示转换，不改源字段或其他文本。原句与已批准备用路由的固定组合均有回归，配置、权限及历史不扩展。该出口合入并核验后再标done，不重复预检、菜单或包名。
+摘要显示边界：`TeamNodeInitiallyBlocked`的两种固定原因经`block_reason`进入摘要；仅在三处显示转换，不改源字段或其他文本。原句与已批准备用路由的固定组合均有回归，配置、权限及历史不扩展。
 
 不要机械替换协议角色`"loom"`、Harness ID `loom-native`、模块/服务/通知/环境变量、socket/数据库/Vault路径、来源版权或历史证据。`Loom Native`是可见的运行时名，Go的兼容校验也比对该名称，不当作应用品牌错误。`InteractionContinuity.primaryFlow`未发现生产引用，不列为活跃界面遗漏；继承的TUI不并入本次macOS盘点。后续仍按分支审查，不自动合main、不提前Q07/Q08迁移。
 
