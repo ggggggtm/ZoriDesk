@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.earendilworks.loom.local.daemon</string>
+    <string>io.github.ggggggtm.zoridesk.local.daemon</string>
     <key>BundleProgram</key>
     <string>Contents/Library/Helpers/loomd</string>
     <key>ProgramArguments</key>
     <array>
         <string>loomd</string>
-        <string>--local-app-service</string>
+        <string>--zoridesk-app-service</string>
     </array>
     <key>EnvironmentVariables</key>
     <dict>

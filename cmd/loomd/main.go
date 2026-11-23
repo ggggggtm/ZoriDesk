@@ -20,7 +20,11 @@ func main() {
 			os.Exit(credentials.ProductKeychainHelperExitCode(err))
 		}
 	}
-	plan, err := prepareLocalAppInvocation(os.Args[1:], localAppServiceArgs)
+	expand := localAppServiceArgs
+	if len(os.Args) > 1 && os.Args[1] == zorideskAppServiceFlag {
+		expand = zorideskAppServiceArgs
+	}
+	plan, err := prepareLocalAppInvocation(os.Args[1:], expand)
 	if err != nil {
 		_, _ = os.Stderr.WriteString("daemon unavailable: local_app_service\n")
 		os.Exit(exitInvalidInput)

@@ -349,7 +349,7 @@ final class LoomGraphiteViewTests: XCTestCase {
         let info = try XCTUnwrap(value as? [String: Any])
         XCTAssertEqual(info["CFBundleDisplayName"] as? String, LocalProductCopy.productName)
         XCTAssertEqual(info["CFBundleName"] as? String, LocalProductCopy.productName)
-        XCTAssertEqual(info["CFBundleIdentifier"] as? String, "com.earendilworks.loom.local")
+        XCTAssertEqual(info["CFBundleIdentifier"] as? String, LocalProductPaths.bundleID)
         XCTAssertEqual(info["CFBundleExecutable"] as? String, "LoomLocalApp")
         XCTAssertEqual(info["CFBundlePackageType"] as? String, "APPL")
     }
@@ -507,12 +507,12 @@ final class LoomGraphiteViewTests: XCTestCase {
         XCTAssertTrue(mission.contains("LocalProductCopy.missionWorkbenchAccessibilityLabel"))
         XCTAssertTrue(mission.contains("LocalProductCopy.governanceAccessibilityLabel"))
 
-        // Display copy must not rename runtime, IPC or installation contracts.
-        XCTAssertTrue(app.contains("com.earendilworks.loom.local"))
+        // Q07 migrates installation identity; protocol, modules and roles stay intact.
+        XCTAssertTrue(app.contains("LocalProductPaths.bundleID"))
         XCTAssertTrue(shell.contains(".loomOpenFolderRequested"))
         XCTAssertTrue(shell.contains("case \"loom-native\""))
         let host = try source("Sources/LoomLocalApp/LocalServiceProcessHost.swift")
-        XCTAssertTrue(host.contains("Library/Application Support/Loom/run/loomd.sock"))
+        XCTAssertTrue(host.contains("LocalProductPaths.installed().socket.path"))
         let package = try source("Package.swift")
         XCTAssertTrue(package.contains("name: \"LoomLocalApp\""))
     }

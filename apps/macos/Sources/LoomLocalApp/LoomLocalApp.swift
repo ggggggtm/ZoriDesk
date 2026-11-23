@@ -27,7 +27,7 @@ private struct LoomApplication: App {
     @StateObject private var serviceProcessHost: LocalServiceProcessHost
     private let serviceBootstrapper: LocalServiceBootstrapper
     private let serviceLogger = Logger(
-        subsystem: "com.earendilworks.loom.local",
+        subsystem: LocalProductPaths.bundleID,
         category: "service-bootstrap"
     )
 

@@ -13,7 +13,7 @@ final class LocalServiceProcessHost: ObservableObject {
         "LOOM_SANDBOX_REQUIRED",
     ]
     private let logger = Logger(
-        subsystem: "com.earendilworks.loom.local",
+        subsystem: LocalProductPaths.bundleID,
         category: "service-bootstrap"
     )
     private var process: Process?
@@ -51,7 +51,7 @@ final class LocalServiceProcessHost: ObservableObject {
         let child = Process()
         child.executableURL = helper
         child.arguments = [
-            "--local-app-service",
+            "--zoridesk-app-service",
             "--parent-pid",
             String(getpid()),
         ]
@@ -160,17 +160,17 @@ final class LocalServiceProcessHost: ObservableObject {
     }
 
     private var defaultSocketPath: String {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/Loom/run/loomd.sock")
-            .path
+        (try? LocalProductPaths.installed().socket.path) ?? ""
     }
 
     nonisolated private static func probeSocketOffMain(
         at path: String
     ) async -> Bool {
-        await Task.detached(priority: .utility) {
-            Self.socketIsReachable(at: path)
-        }.value
+        do {
+            return try await LocalIPCClient(socketPath: path, expectedBuildID: LocalProductPaths.buildID).ping()
+        } catch {
+            return false
+        }
     }
 
     nonisolated static func socketIsReachable(at path: String) -> Bool {
@@ -246,7 +246,7 @@ final class LocalServiceProcessHost: ObservableObject {
 
     private var servicePath: String? {
         let plist = Bundle.main.bundleURL.appendingPathComponent(
-            "Contents/Library/LaunchAgents/com.earendilworks.loom.local.daemon.plist"
+            "Contents/Library/LaunchAgents/\(LocalProductPaths.serviceLabel).plist"
         )
         guard let data = try? Data(contentsOf: plist),
               let root = try? PropertyListSerialization.propertyList(
@@ -266,8 +266,9 @@ final class LocalServiceProcessHost: ObservableObject {
     }
 
     private func daemonConsoleHandle() -> FileHandle? {
-        let directory = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/Loom/diagnostics")
+        guard let paths = try? LocalProductPaths.installed(),
+              (try? paths.prepareRoot()) != nil else { return nil }
+        let directory = paths.diagnostics
         do {
             try FileManager.default.createDirectory(
                 at: directory,

@@ -9,7 +9,7 @@
     <key>CFBundleExecutable</key>
     <string>LoomLocalApp</string>
     <key>CFBundleIdentifier</key>
-    <string>com.earendilworks.loom.local</string>
+    <string>io.github.ggggggtm.zoridesk.local</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>

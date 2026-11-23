@@ -183,9 +183,10 @@ final class LocalOperationalDiagnostics: @unchecked Sendable {
     private let lock = NSLock()
 
     static func installedStore() throws -> LocalOperationalDiagnostics {
-        try LocalOperationalDiagnostics(
-            directory: FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent("Library/Application Support/Loom/diagnostics"),
+        let paths = try LocalProductPaths.installed()
+        try paths.prepareRoot()
+        return try LocalOperationalDiagnostics(
+            directory: paths.diagnostics,
             maximumBytes: 512 * 1_024,
             now: { Date() }
         )

@@ -2,8 +2,8 @@
 set -eu
 
 usage() {
-  echo "usage: install-loom-local-app.sh [--dry-run] --app PATH --destination /absolute/path/Loom.app" >&2
-  echo "       install-loom-local-app.sh --rollback --destination /absolute/path/Loom.app" >&2
+  echo "usage: install-loom-local-app.sh [--dry-run] --app PATH --destination /absolute/path/ZoriDesk.app" >&2
+  echo "       install-loom-local-app.sh --rollback --destination /absolute/path/ZoriDesk.app" >&2
   exit 2
 }
 
@@ -39,15 +39,22 @@ while [ "$#" -gt 0 ]; do
 done
 [ -n "$destination" ] || usage
 case "$destination" in
-  /*/Loom.app) ;;
+  /*/ZoriDesk.app) ;;
   *) usage ;;
 esac
 [ "$destination" = "${destination%/}" ] || usage
 
 effective_uid=$(/usr/bin/id -u)
 destination_parent=$(/usr/bin/dirname "$destination")
+case "$destination_parent/" in
+  *.[aA][pP][pP]/*) echo "destination must not be inside an application bundle" >&2; exit 3 ;;
+esac
 [ -d "$destination_parent" ] && [ ! -L "$destination_parent" ] || {
   echo "invalid destination parent" >&2
+  exit 3
+}
+[ "$(CDPATH= cd -- "$destination_parent" && pwd -P)" = "$destination_parent" ] || {
+  echo "non-canonical destination parent" >&2
   exit 3
 }
 [ "$(/usr/bin/stat -f '%u' "$destination_parent")" = "$effective_uid" ] || {
@@ -90,7 +97,7 @@ validate_bundle() {
   [ "$(/usr/bin/stat -f '%u' "$bundle")" = "$effective_uid" ] || return 1
   executable="$bundle/Contents/MacOS/LoomLocalApp"
   helper="$bundle/Contents/Library/Helpers/loomd"
-  agent_plist="$bundle/Contents/Library/LaunchAgents/com.earendilworks.loom.local.daemon.plist"
+  agent_plist="$bundle/Contents/Library/LaunchAgents/io.github.ggggggtm.zoridesk.local.daemon.plist"
   plist="$bundle/Contents/Info.plist"
   [ -f "$executable" ] && [ ! -L "$executable" ] || return 1
   [ -f "$helper" ] && [ ! -L "$helper" ] || return 1
@@ -116,7 +123,7 @@ validate_bundle() {
   )" ] || return 1
   [ "$(
     /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$plist"
-  )" = com.earendilworks.loom.local ] || return 1
+  )" = io.github.ggggggtm.zoridesk.local ] || return 1
   /usr/bin/lipo -archs "$executable" |
     /usr/bin/grep -Eq '(^| )arm64( |$)' || return 1
   /usr/bin/lipo -archs "$helper" |
@@ -124,11 +131,23 @@ validate_bundle() {
   [ "$(
     /usr/libexec/PlistBuddy -c 'Print :BundleProgram' "$agent_plist"
   )" = Contents/Library/Helpers/loomd ] || return 1
+  [ "$(/usr/libexec/PlistBuddy -c 'Print :Label' "$agent_plist")" = io.github.ggggggtm.zoridesk.local.daemon ] || return 1
+  [ "$(/usr/libexec/PlistBuddy -c 'Print :ProgramArguments:0' "$agent_plist")" = loomd ] || return 1
+  [ "$(/usr/libexec/PlistBuddy -c 'Print :ProgramArguments:1' "$agent_plist")" = --zoridesk-app-service ] || return 1
+  ! /usr/libexec/PlistBuddy -c 'Print :ProgramArguments:2' "$agent_plist" >/dev/null 2>&1 || return 1
   /usr/bin/codesign --verify --deep --strict "$bundle" || return 1
 }
 
-transaction="$destination_parent/.Loom.app.transaction.$$"
-incoming="$destination_parent/.Loom.app.incoming.$$"
+# Never replace or delete an unrecognized current/rollback bundle.
+for controlled in "$destination" "$previous"; do
+  if [ -e "$controlled" ] && ! validate_bundle "$controlled"; then
+    echo "foreign or invalid app target" >&2
+    exit 3
+  fi
+done
+
+transaction="$destination_parent/.ZoriDesk.app.transaction.$$"
+incoming="$destination_parent/.ZoriDesk.app.incoming.$$"
 transaction_mode=none
 had_current=0
 had_previous=0
@@ -222,7 +241,7 @@ fi
 
 [ -n "$source_app" ] || usage
 case "$source_app" in
-  /*/Loom.app) ;;
+  /*/ZoriDesk.app) ;;
   *) usage ;;
 esac
 validate_bundle "$source_app" || {

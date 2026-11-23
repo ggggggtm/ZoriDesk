@@ -222,13 +222,24 @@ enum LocalPrivateRegistryStorage {
     _ operation: (Int32, String) throws -> T
   ) throws -> T {
     guard url.isFileURL else { throw StorageError.unsafePath }
-    let standardizedURL = url.standardizedFileURL
-    guard standardizedURL.path == url.path else { throw StorageError.unsafePath }
+    let path = url.path
+    guard path.hasPrefix("/"), !path.hasSuffix("/"), !path.contains("\0"),
+      !path.contains("//"),
+      !path.split(separator: "/").contains(where: { $0 == "." || $0 == ".." })
+    else { throw StorageError.unsafePath }
+    let standardizedURL = url
     let directoryURL = standardizedURL.deletingLastPathComponent()
     let fileName = standardizedURL.lastPathComponent
     guard !fileName.isEmpty, fileName != ".", fileName != ".." else {
       throw StorageError.unsafePath
     }
+    let parent = directoryURL.deletingLastPathComponent().path
+    guard let resolvedParent = realpath(parent, nil) else {
+      throw StorageError.unsafePath
+    }
+    let canonicalParent = String(cString: resolvedParent)
+    free(resolvedParent)
+    guard canonicalParent == parent else { throw StorageError.unsafePath }
 
     var directoryStatus = stat()
     if lstat(directoryURL.path, &directoryStatus) != 0 {
@@ -1516,8 +1527,7 @@ public final class LocalProductStore: ObservableObject {
     if let chatSessionsFileURL {
       self.chatSessionsFileURL = chatSessionsFileURL
     } else {
-      let home = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Library/Application Support/Loom")
+      let home = LocalProductPaths.installedRoot
       self.chatSessionsFileURL = home.appendingPathComponent("chat-sessions.json")
     }
     if let missionPresentationsFileURL {

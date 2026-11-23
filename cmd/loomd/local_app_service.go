@@ -11,11 +11,17 @@ import (
 	"strings"
 	"syscall"
 
+	"loom-pi-rebuild/internal/productidentity"
 	"loom-pi-rebuild/internal/runtime/harnessadapter"
 )
 
 const localAppServiceFlag = "--local-app-service"
+const zorideskAppServiceFlag = "--zoridesk-app-service"
 const managedLocalAppParentFlag = "--managed-parent-pid"
+
+func isLocalAppServiceFlag(value string) bool {
+	return value == localAppServiceFlag || value == zorideskAppServiceFlag
+}
 
 type localAppInvocationPlan struct {
 	Args      []string
@@ -30,7 +36,7 @@ func prepareLocalAppInvocation(
 	if expand == nil {
 		return localAppInvocationPlan{}, errors.New("invalid local app invocation")
 	}
-	if len(args) > 0 && args[0] == localAppServiceFlag {
+	if len(args) > 0 && isLocalAppServiceFlag(args[0]) {
 		parentPID, err := parseLocalAppServiceParentPID(args)
 		if err != nil {
 			return localAppInvocationPlan{}, err
@@ -119,7 +125,7 @@ func validCanonicalLocalAppRunArgs(args []string) bool {
 
 func containsLocalAppInternalFlag(args []string) bool {
 	for _, argument := range args {
-		if argument == localAppServiceFlag ||
+		if isLocalAppServiceFlag(argument) ||
 			argument == managedLocalAppParentFlag ||
 			strings.HasPrefix(argument, managedLocalAppParentFlag+"=") {
 			return true
@@ -136,13 +142,34 @@ func localAppServiceArgs() ([]string, error) {
 	return localAppServiceArgsForHome(home, exec.LookPath, os.Stderr)
 }
 
+func zorideskAppServiceArgs() ([]string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, errors.New("local app home unavailable")
+	}
+	return localAppServiceArgsForHomeAndProduct(home, exec.LookPath, os.Stderr, zorideskAppServiceFlag)
+}
+
 // Only auto-discovered optional tools are degraded here. Explicit daemon flags
 // and shared state/storage validation remain fail-closed.
 func localAppServiceArgsForHome(home string, lookup func(string) (string, error), warnings io.Writer) ([]string, error) {
+	return localAppServiceArgsForHomeAndProduct(home, lookup, warnings, localAppServiceFlag)
+}
+
+func localAppServiceArgsForHomeAndProduct(home string, lookup func(string) (string, error), warnings io.Writer, serviceFlag string) ([]string, error) {
 	if !filepath.IsAbs(home) || filepath.Clean(home) != home || lookup == nil || warnings == nil {
 		return nil, errors.New("invalid local app environment")
 	}
 	appSupport := filepath.Join(home, "Library", "Application Support", "Loom")
+	if serviceFlag == zorideskAppServiceFlag {
+		paths, err := productidentity.ForHome(home)
+		if err != nil {
+			return nil, err
+		}
+		appSupport = paths.Root
+	} else if serviceFlag != localAppServiceFlag {
+		return nil, errors.New("invalid local app product")
+	}
 	for _, directory := range []string{home, filepath.Join(home, "Library"), filepath.Join(home, "Library", "Application Support")} {
 		if err := ensureLocalAppParentDirectory(directory); err != nil {
 			return nil, errors.New("local app parent directory unavailable")
@@ -158,7 +185,7 @@ func localAppServiceArgsForHome(home string, lookup func(string) (string, error)
 			return nil, errors.New("local app private directory unavailable")
 		}
 	}
-	runtimeDirs, err := installedLocalAppRuntimeDirs(home)
+	runtimeDirs, err := installedLocalAppRuntimeDirsAtRoot(filepath.Join(appSupport, "runtimes", "pi"))
 	if err != nil {
 		_, _ = io.WriteString(warnings, "Pi unavailable: install or repair the optional Pi runtime and restart; other configured backends remain available.\n")
 		runtimeDirs = nil
@@ -184,7 +211,7 @@ func localAppServiceArgsForHome(home string, lookup func(string) (string, error)
 		claudePath = ""
 	}
 	return expandLocalAppServiceArgs(
-		[]string{localAppServiceFlag}, home, runtimeDirs, codexPath, opencodePath, claudePath,
+		[]string{serviceFlag}, home, runtimeDirs, codexPath, opencodePath, claudePath,
 	)
 }
 
@@ -216,10 +243,10 @@ func validLocalAppExecutable(path string) bool {
 }
 
 func parseLocalAppServiceParentPID(args []string) (int, error) {
-	if len(args) == 1 && args[0] == localAppServiceFlag {
+	if len(args) == 1 && isLocalAppServiceFlag(args[0]) {
 		return 0, nil
 	}
-	if len(args) != 3 || args[0] != localAppServiceFlag ||
+	if len(args) != 3 || !isLocalAppServiceFlag(args[0]) ||
 		args[1] != "--parent-pid" {
 		return 0, errors.New("invalid local app service invocation")
 	}
@@ -235,6 +262,10 @@ func installedLocalAppRuntimeDirs(home string) ([]string, error) {
 		home,
 		"Library", "Application Support", "Loom", "runtimes", "pi",
 	)
+	return installedLocalAppRuntimeDirsAtRoot(runtimeRoot)
+}
+
+func installedLocalAppRuntimeDirsAtRoot(runtimeRoot string) ([]string, error) {
 	entries, err := os.ReadDir(runtimeRoot)
 	if err != nil {
 		return nil, errors.New("local app runtime unavailable")
@@ -268,14 +299,22 @@ func expandLocalAppServiceArgs(
 	opencodeExecutable string,
 	harnessExecutables ...string,
 ) ([]string, error) {
-	if len(args) != 1 || args[0] != localAppServiceFlag ||
+	if len(args) != 1 || !isLocalAppServiceFlag(args[0]) ||
 		!filepath.IsAbs(home) || filepath.Clean(home) != home {
 		return nil, errors.New("invalid local app service input")
+	}
+	appSupport := filepath.Join(home, "Library", "Application Support", "Loom")
+	if args[0] == zorideskAppServiceFlag {
+		paths, err := productidentity.ForHome(home)
+		if err != nil {
+			return nil, err
+		}
+		appSupport = paths.Root
 	}
 	var version string
 	if len(runtimeDirs) > 0 {
 		var ok bool
-		version, ok = localAppRuntimeVersion(home, runtimeDirs[0])
+		version, ok = localAppRuntimeVersionAtRoot(filepath.Join(appSupport, "runtimes", "pi"), runtimeDirs[0])
 		if !ok {
 			return nil, errors.New("invalid local app runtime")
 		}
@@ -289,10 +328,12 @@ func expandLocalAppServiceArgs(
 			return nil, errors.New("local app runtime unavailable")
 		}
 	}
-	appSupport := filepath.Join(home, "Library", "Application Support", "Loom")
 	expanded := []string{
 		"--state", filepath.Join(appSupport, "state", "loom.db"),
 		"--isolation-root", filepath.Join(appSupport, "isolation"),
+	}
+	if args[0] == zorideskAppServiceFlag {
+		expanded = append(expanded, "--product-id", productidentity.ProductID)
 	}
 	for _, directory := range runtimeDirs {
 		expanded = append(expanded, "--runtime-dir", directory)
@@ -338,11 +379,13 @@ func expandLocalAppServiceArgs(
 		expanded = append(expanded, "--claude-executable", claudeExecutable)
 	}
 	credentialImportPath := filepath.Join(home, ".cc-switch", "cc-switch.db")
-	if _, err := os.Lstat(credentialImportPath); err == nil {
-		expanded = append(
-			expanded,
-			"--credential-import-source", credentialImportPath,
-		)
+	if args[0] == localAppServiceFlag {
+		if _, err := os.Lstat(credentialImportPath); err == nil {
+			expanded = append(
+				expanded,
+				"--credential-import-source", credentialImportPath,
+			)
+		}
 	}
 	return expanded, nil
 }
@@ -352,6 +395,10 @@ func localAppRuntimeVersion(home, runtimeDir string) (string, bool) {
 		home,
 		"Library", "Application Support", "Loom", "runtimes", "pi",
 	)
+	return localAppRuntimeVersionAtRoot(root, runtimeDir)
+}
+
+func localAppRuntimeVersionAtRoot(root, runtimeDir string) (string, bool) {
 	relative, err := filepath.Rel(root, runtimeDir)
 	if err != nil {
 		return "", false

@@ -11,14 +11,15 @@ if [ ! -f "$builder" ] || [ ! -f "$installer" ]; then
 fi
 
 private_root=$(mktemp -d "${TMPDIR:-/tmp}/loom-native-install.XXXXXX")
+private_root=$(CDPATH= cd -- "$private_root" && pwd -P)
 trap 'chmod -R u+rwX "$private_root" 2>/dev/null || true; rm -rf "$private_root"' EXIT HUP INT TERM
 chmod 700 "$private_root"
 
 source_parent="$private_root/source"
 install_parent="$private_root/Applications"
 mkdir -m 700 "$source_parent" "$install_parent"
-source_app="$source_parent/Loom.app"
-destination="$install_parent/Loom.app"
+source_app="$source_parent/ZoriDesk.app"
+destination="$install_parent/ZoriDesk.app"
 
 "$builder" --output "$source_app"
 before=$(find "$private_root" -type f -exec shasum -a 256 {} \; | LC_ALL=C sort)
@@ -33,7 +34,7 @@ cmp "$source_app/Contents/MacOS/LoomLocalApp" \
 
 first_digest=$(find "$destination" -type f -exec shasum -a 256 {} \; |
   LC_ALL=C sort)
-replacement="$source_parent/replacement/Loom.app"
+replacement="$source_parent/replacement/ZoriDesk.app"
 mkdir -m 700 "$source_parent/replacement"
 cp -R "$source_app" "$replacement"
 printf '%s\n' fixture-v2 >"$replacement/Contents/Resources/fixture-version"
@@ -75,10 +76,10 @@ test "$first_digest" = \
 attack_parent="$private_root/attack"
 outside="$private_root/outside"
 mkdir -m 700 "$attack_parent" "$outside"
-ln -s "$outside" "$attack_parent/Loom.app"
+ln -s "$outside" "$attack_parent/ZoriDesk.app"
 if "$installer" \
   --app "$source_app" \
-  --destination "$attack_parent/Loom.app" >/dev/null 2>&1
+  --destination "$attack_parent/ZoriDesk.app" >/dev/null 2>&1
 then
   echo "symlinked app destination was accepted" >&2
   exit 1
