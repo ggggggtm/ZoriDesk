@@ -4,11 +4,13 @@ set -eu
 usage() {
   echo "usage: install-loom-local-app.sh [--dry-run] --app PATH --destination /absolute/path/ZoriDesk.app" >&2
   echo "       install-loom-local-app.sh --rollback --destination /absolute/path/ZoriDesk.app" >&2
+  echo "       install-loom-local-app.sh --recover --destination /absolute/path/ZoriDesk.app" >&2
   exit 2
 }
 
 dry_run=0
 rollback=0
+recover=0
 source_app=
 destination=
 
@@ -20,6 +22,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --rollback)
       rollback=1
+      shift
+      ;;
+    --recover)
+      recover=1
       shift
       ;;
     --app)
@@ -37,6 +43,7 @@ while [ "$#" -gt 0 ]; do
       ;;
   esac
 done
+[ "$recover" -eq 0 ] || { [ "$rollback" -eq 0 ] && [ "$dry_run" -eq 0 ] && [ -z "$source_app" ]; } || usage
 [ -n "$destination" ] || usage
 case "$destination" in
   /*/ZoriDesk.app) ;;
@@ -85,7 +92,7 @@ do
     }
   fi
 done
-if [ -d "$previous" ] && [ ! -d "$destination" ]; then
+if [ "$recover" -eq 0 ] && [ -d "$previous" ] && [ ! -d "$destination" ]; then
   echo "rollback app exists without current app" >&2
   exit 3
 fi
@@ -146,81 +153,13 @@ for controlled in "$destination" "$previous"; do
   fi
 done
 
-transaction="$destination_parent/.ZoriDesk.app.transaction.$$"
-incoming="$destination_parent/.ZoriDesk.app.incoming.$$"
-transaction_mode=none
-had_current=0
-had_previous=0
-new_installed=0
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)/lib/desktop-install-transaction.sh"
+desktop_configure || { echo "invalid app transaction target" >&2; exit 3; }
 
-restore_active_transaction() {
-  case "$transaction_mode" in
-    install)
-      if [ -d "$transaction/current" ] &&
-        [ ! -L "$transaction/current" ]
-      then
-        if [ -d "$destination" ] && [ ! -L "$destination" ]; then
-          /bin/chmod -R u+rwX "$destination" 2>/dev/null || true
-          /bin/rm -rf "$destination"
-        fi
-        /bin/mv "$transaction/current" "$destination" || true
-      elif [ "$had_current" -eq 0 ] &&
-        [ "$new_installed" -eq 1 ] &&
-        [ -d "$destination" ] &&
-        [ ! -L "$destination" ]
-      then
-        /bin/chmod -R u+rwX "$destination" 2>/dev/null || true
-        /bin/rm -rf "$destination"
-      fi
-      if [ -d "$transaction/previous" ] &&
-        [ ! -L "$transaction/previous" ] &&
-        [ ! -e "$previous" ] &&
-        [ ! -L "$previous" ]
-      then
-        /bin/mv "$transaction/previous" "$previous" || true
-      fi
-      ;;
-    rollback)
-      if [ -d "$transaction/current" ] &&
-        [ -d "$destination" ] &&
-        [ ! -L "$destination" ] &&
-        [ ! -e "$previous" ] &&
-        [ ! -L "$previous" ]
-      then
-        /bin/mv "$destination" "$previous" || true
-      fi
-      if [ -d "$transaction/current" ] &&
-        [ ! -L "$transaction/current" ]
-      then
-        /bin/mv "$transaction/current" "$destination" || true
-      fi
-      ;;
-  esac
-  transaction_mode=none
-}
-
-cleanup() {
-  if [ "$transaction_mode" != none ]; then
-    restore_active_transaction
-  fi
-  if [ -d "$incoming" ] && [ ! -L "$incoming" ]; then
-    /bin/chmod -R u+rwX "$incoming" 2>/dev/null || true
-    /bin/rm -rf "$incoming"
-  fi
-  if [ -d "$transaction" ] && [ ! -L "$transaction" ]; then
-    /bin/chmod -R u+rwX "$transaction" 2>/dev/null || true
-    /bin/rm -rf "$transaction"
-  fi
-}
-handle_signal() {
-  trap '' HUP INT TERM
-  restore_active_transaction
-  cleanup
-  trap - EXIT
-  exit 98
-}
-trap cleanup EXIT
-trap handle_signal HUP INT TERM
+if [ "$recover" -eq 1 ]; then
+  desktop_recover 2>/dev/null || { echo "app recovery unavailable; transaction retained" >&2; exit 3; }
+  exit 0
+fi
 
 if [ "$rollback" -eq 1 ]; then
   [ "$dry_run" -eq 0 ] && [ -z "$source_app" ] || usage
@@ -228,14 +167,7 @@ if [ "$rollback" -eq 1 ]; then
     echo "rollback unavailable" >&2
     exit 3
   }
-  /bin/mkdir -m 700 "$transaction"
-  transaction_mode=rollback
-  /bin/mv "$destination" "$transaction/current"
-  /bin/mv "$previous" "$destination"
-  /bin/mv "$transaction/current" "$previous"
-  transaction_mode=none
-  /bin/rmdir "$transaction"
-  trap - EXIT HUP INT TERM
+  desktop_rollback 2>/dev/null || { echo "app rollback failed" >&2; exit 3; }
   exit 0
 fi
 
@@ -253,47 +185,4 @@ if [ "$dry_run" -eq 1 ]; then
   exit 0
 fi
 
-/bin/cp -pR "$source_app" "$incoming"
-validate_bundle "$incoming" || {
-  echo "copied app failed validation" >&2
-  exit 3
-}
-
-/bin/mkdir -m 700 "$transaction"
-transaction_mode=install
-if [ -d "$destination" ]; then
-  /bin/mv "$destination" "$transaction/current"
-  had_current=1
-fi
-if [ -d "$previous" ]; then
-  /bin/mv "$previous" "$transaction/previous"
-  had_previous=1
-fi
-
-if ! /bin/mv "$incoming" "$destination"; then
-  exit 3
-fi
-new_installed=1
-if [ "${LOOM_APP_INSTALL_TEST_FAIL_STEP:-}" = after_swap ]; then
-  echo "injected app installation failure" >&2
-  exit 97
-fi
-if [ "${LOOM_APP_INSTALL_TEST_SIGNAL_STEP:-}" = after_swap ]; then
-  kill -TERM "$$"
-  exit 98
-fi
-if ! validate_bundle "$destination"; then
-  echo "installed app failed validation" >&2
-  exit 3
-fi
-
-if [ "$had_current" -eq 1 ]; then
-  /bin/mv "$transaction/current" "$previous"
-fi
-transaction_mode=none
-if [ "$had_previous" -eq 1 ] && [ -d "$transaction/previous" ]; then
-  /bin/chmod -R u+rwX "$transaction/previous"
-  /bin/rm -rf "$transaction/previous"
-fi
-/bin/rmdir "$transaction"
-trap - EXIT HUP INT TERM
+desktop_install 2>/dev/null || { echo "app installation failed" >&2; exit 3; }

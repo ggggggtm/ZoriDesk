@@ -117,6 +117,7 @@ identity_tests=(
   testProductIdentityWiringMatchesBundleAndBothBootstrapPaths
   testInstallerDryRunRefusesUnknownExistingBundleWithoutMutation
   testProductRegistryRejectsAliasedParentBeforeCreatingFiles
+  testInstallerSharedTransactionRecoversInterruptedFixture
 )
 identity_filter=$(IFS='|'; echo "${identity_tests[*]}")
 identity_ipc_tests=(

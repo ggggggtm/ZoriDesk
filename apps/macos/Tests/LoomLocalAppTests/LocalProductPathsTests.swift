@@ -4,6 +4,74 @@ import XCTest
 @testable import LoomLocalAppCore
 
 final class LocalProductPathsTests: XCTestCase {
+    func testInstallerSharedTransactionRecoversInterruptedFixture() throws {
+        var repo = URL(fileURLWithPath: #filePath)
+        for _ in 0..<5 { repo.deleteLastPathComponent() }
+        let root = URL(fileURLWithPath: "/private/tmp")
+            .appendingPathComponent("zd-transaction-\(UUID().uuidString.prefix(8))")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false,
+                                               attributes: [.posixPermissions: 0o700])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let library = repo.appendingPathComponent("scripts/lib/desktop-install-transaction.sh")
+        func write(_ path: String, _ value: String) throws {
+            let file = root.appendingPathComponent(path)
+            try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true,
+                                                   attributes: [.posixPermissions: 0o700])
+            try Data(value.utf8).write(to: file)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
+        }
+        try write("Applications/ZoriDesk.app/fixture-version", "v1")
+        try write("Applications/ZoriDesk.app.previous/fixture-version", "v0")
+        try write("source/ZoriDesk.app/fixture-version", "v2")
+        for path in ["Applications/Loom.app/keep", "Library/Application Support/Loom/keep",
+                     "Library/Application Support/ZoriDesk/keep"] { try write(path, "untouched") }
+        let script = #"""
+        set -eu
+        . "$1"
+        destination="$2/Applications/ZoriDesk.app"
+        source_app="$2/source/ZoriDesk.app"
+        operation=$3
+        validate_bundle() {
+          [ -d "$1" ] && [ ! -L "$1" ] && [ -f "$1/fixture-version" ] || return 1
+          if [ "$operation" = crash ] && [ "$1" = "$destination" ] &&
+            [ "$(cat "$1/fixture-version")" = v2 ]; then kill -KILL "$$"; fi
+        }
+        desktop_configure
+        case "$operation" in
+          crash|install) desktop_install ;;
+          recover) desktop_recover ;;
+          rollback) desktop_rollback ;;
+          *) exit 2 ;;
+        esac
+        """#
+        func run(_ operation: String) throws -> Int32 {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/bin/sh")
+            process.arguments = ["-c", script, "fixture", library.path, root.path, operation]
+            process.environment = ["PATH": "/usr/bin:/bin:/usr/sbin:/sbin"]
+            let output = Pipe()
+            process.standardOutput = output
+            process.standardError = output
+            try process.run()
+            process.waitUntilExit()
+            return process.terminationStatus
+        }
+        XCTAssertNotEqual(try run("crash"), 0)
+        let receipt = root.appendingPathComponent("Applications/.ZoriDesk.app.transaction/receipt")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: receipt.path))
+        XCTAssertEqual(try run("recover"), 0)
+        XCTAssertEqual(try String(contentsOf: root.appendingPathComponent("Applications/ZoriDesk.app/fixture-version"), encoding: .utf8), "v1")
+        XCTAssertEqual(try String(contentsOf: root.appendingPathComponent("Applications/ZoriDesk.app.previous/fixture-version"), encoding: .utf8), "v0")
+        XCTAssertEqual(try run("install"), 0)
+        XCTAssertEqual(try run("rollback"), 0)
+        XCTAssertEqual(try String(contentsOf: root.appendingPathComponent("Applications/ZoriDesk.app/fixture-version"), encoding: .utf8), "v1")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: receipt.path))
+        for path in ["Applications/Loom.app/keep", "Library/Application Support/Loom/keep",
+                     "Library/Application Support/ZoriDesk/keep"] {
+            XCTAssertEqual(try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8), "untouched")
+        }
+    }
+
     func testProductPathsMatchSharedDaemonFixture() throws {
         var repo = URL(fileURLWithPath: #filePath)
         for _ in 0..<5 { repo.deleteLastPathComponent() }
