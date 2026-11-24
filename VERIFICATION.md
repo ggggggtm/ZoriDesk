@@ -328,3 +328,17 @@ Q12整项完成依据见[TASKS验收矩阵](TASKS.md#q12让诊断可理解可操
 先加`testMissionSummaryBlockReasonBrandingIsExact`：两个理由、原摘要往返、九种其他提示与空白/格式、三处显示接线。断言适配器链接实际Core/UI、按旧接线调用原格式函数，旧版28/36（四条品牌及四条接线预期失败）；修后普通与ThreadSanitizer各36/36。Swift应用构建、本地Go普通/race各107条Sandbox与626条启动/Provider无跳过。未启动真实任务/VoiceOver，不重复菜单实测，也不宣称安装、模型或全仓E2E。
 
 `379a564`的[分支CI43840277248](https://github.com/ggggggtm/ZoriDesk/actions/runs/43840277248)通过后，复核并按明确授权保留历史合入main `68e6ce2`。该提交自己的[合并CI43842215266](https://github.com/ggggggtm/ZoriDesk/actions/runs/43842215266)原始日志确认：Linux普通/race各107条Sandbox及626条启动/Provider记录；macOS应用编译成功，原71项加摘要回归共72项XCTest通过，无跳过。这是Q06收尾验收，不改变已验菜单范围或安装/迁移标识。
+
+## Q07/Q08：产品身份与数据隔离代码批（2026-11-23）
+
+这是独立于旧 Loom 安装的代码候选，不是已安装或已发布能力。背景与后续验收见[ADR-0023](docs/adr/0023-zoridesk-side-by-side-installation.md)。本批不是继续改显示文案。
+
+入口链路为：应用/LaunchAgent 的新入口 → `prepareLocalAppInvocation` 固定重执行 → `productidentity.ForHome` → `run` 校验产品与三条路径 → 新根上的状态/Vault/IPC。Swift 的 `LocalProductPaths` 供客户端、宿主、注册描述、界面持久化和诊断共同使用；同一虚构 JSON 夹具跨语言核对。默认客户端在读写前核对现有 ping 的产品 Build ID，错产品时不发业务请求。Build ID 不替代本机 IPC 的用户/权限校验。
+
+拒绝路径包括混用旧根/旧 socket、未知产品、隐式凭证导入、过长/NUL/非规范路径及旧目录软链。旧生产激活写入口在新产品装配中不构造，避免另建旧服务；其他工作装配仍可用。构建和安装目标改为 ZoriDesk.app；Loom.app、嵌套于既有应用的目标及未知已有包在写入前拒绝。没有运行签名或实际安装脚本的成功路径。
+
+先在旧生产逻辑补入口/导入/安装目标回归，真实失败后实现。真实临时后台验证新 ping、设置、Vault 路径和旧文件不变。本地启动/Provider普通/race各679条(7包)、Sandbox各107条(2包)无跳过；其中15项为受影响的装配检查。Swift应用编译通过，探针链接实际Core核对路径和UDS mock，普通与ThreadSanitizer各34项断言通过；不冒充本机缺失的XCTest。macOS入口保留原72项、追加8项共80，逐项要求passed且拒绝skip/空选；分支CI待实际核验。
+
+未覆盖：完整安装、服务注册/签名、安装成功后回退、真实桌面/模型与全仓E2E。默认空数据，新Vault不自动读旧凭证；迁移预览、显式选择、备份、冲突、收据和恢复尚未实现。Q07/Q08不能因此标done，不重复Q06/Q12或提前Docker。
+
+2026-11-24再次完整复核33文件，定向`TestZoriDesk*`/`TestPaths*`本地普通/race通过，未机械重跑未变的完整本地基线。准确分支[CI45185394649](https://github.com/ggggggtm/ZoriDesk/actions/runs/45185394649)的Linux job137729541383原始日志确认Sandbox普通/race各107条、启动/Provider各679条无跳过；macOS job137729542108编译和80项XCTest通过无跳过。本次按明确授权保留历史合main；合并CI必须独立核验，不借用上述分支结果。仅新增验收说明，原33文件中的代码、测试、工作流选择与锁文件未再修改。

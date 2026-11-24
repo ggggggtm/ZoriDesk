@@ -1,0 +1,13 @@
+{
+  "product_id": "zoridesk",
+  "bundle_id": "io.github.ggggggtm.zoridesk.local",
+  "service_label": "io.github.ggggggtm.zoridesk.local.daemon",
+  "build_id": "zoridesk-local-v1",
+  "home": "/Users/fixture",
+  "root": "/Users/fixture/Library/Application Support/ZoriDesk",
+  "socket": "/Users/fixture/Library/Application Support/ZoriDesk/run/loomd.sock",
+  "state": "/Users/fixture/Library/Application Support/ZoriDesk/state/loom.db",
+  "vault": "/Users/fixture/Library/Application Support/ZoriDesk/state/credential-vault.db",
+  "key": "/Users/fixture/Library/Application Support/ZoriDesk/private/vault.key",
+  "diagnostics": "/Users/fixture/Library/Application Support/ZoriDesk/diagnostics"
+}

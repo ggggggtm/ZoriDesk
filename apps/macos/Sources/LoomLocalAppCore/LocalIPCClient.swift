@@ -801,9 +801,11 @@ public final class LocalIPCClient:
     private let requestID: @Sendable () -> String
     private let operationalDiagnostics: LocalOperationalDiagnostics
     private let recordsInstalledDiagnostics: Bool
+    private let expectedBuildID: String?
 
     public convenience init(
         socketPath: String,
+        expectedBuildID: String? = nil,
         requestID: @escaping @Sendable () -> String = {
             "loom-swift-\(UUID().uuidString.lowercased())"
         }
@@ -812,7 +814,8 @@ public final class LocalIPCClient:
             socketPath: socketPath,
             requestID: requestID,
             operationalDiagnostics: LocalOperationalDiagnostics.installedStore(),
-            recordsInstalledDiagnostics: Self.isInstalledSocketPath(socketPath)
+            recordsInstalledDiagnostics: Self.isInstalledSocketPath(socketPath),
+            expectedBuildID: expectedBuildID ?? (Self.isInstalledSocketPath(socketPath) ? LocalProductPaths.buildID : nil)
         )
     }
 
@@ -820,7 +823,8 @@ public final class LocalIPCClient:
         socketPath: String,
         requestID: @escaping @Sendable () -> String,
         operationalDiagnostics: LocalOperationalDiagnostics,
-        recordsInstalledDiagnostics: Bool = true
+        recordsInstalledDiagnostics: Bool = true,
+        expectedBuildID: String? = nil
     ) throws {
         guard Self.validateSocketPathSyntax(socketPath) else {
             throw LocalProductClientError.invalidSocket
@@ -829,6 +833,7 @@ public final class LocalIPCClient:
         self.requestID = requestID
         self.operationalDiagnostics = operationalDiagnostics
         self.recordsInstalledDiagnostics = recordsInstalledDiagnostics
+        self.expectedBuildID = expectedBuildID
     }
 
     public static func defaultClient() throws -> LocalIPCClient {
@@ -838,16 +843,11 @@ public final class LocalIPCClient:
                   socketIndex + 1 < arguments.count else {
                 throw LocalProductClientError.invalidSocket
             }
-            return try LocalIPCClient(socketPath: arguments[socketIndex + 1])
+            return try LocalIPCClient(socketPath: arguments[socketIndex + 1], expectedBuildID: LocalProductPaths.buildID)
         }
-        let home = FileManager.default.homeDirectoryForCurrentUser
-            .resolvingSymlinksInPath()
-            .standardizedFileURL
+        let paths = try LocalProductPaths.installed()
         return try LocalIPCClient(
-            socketPath: home
-                .appendingPathComponent("Library/Application Support/Loom/run")
-                .appendingPathComponent("loomd.sock")
-                .path
+            socketPath: paths.socket.path, expectedBuildID: LocalProductPaths.buildID
         )
     }
 
@@ -2333,8 +2333,12 @@ public final class LocalIPCClient:
         let result = try await call(method: "ping", params: EmptyParams())
         try StrictJSONScanner.validate(result)
         let decoded = try JSONDecoder().decode(PingResult.self, from: result)
+        if expectedBuildID == LocalProductPaths.buildID {
+            return LocalProductPaths.acceptsPing(
+                protocolVersion: decoded.protocolVersion, available: decoded.available, buildID: decoded.buildID)
+        }
         return decoded.protocolVersion == 1 && decoded.available &&
-            !decoded.buildID.isEmpty
+            !decoded.buildID.isEmpty && (expectedBuildID == nil || decoded.buildID == expectedBuildID)
     }
 
     public func chatThread(threadID: String) async throws -> LocalProductChatThread {
@@ -2732,6 +2736,9 @@ public final class LocalIPCClient:
         guard LocalIPCWire.validRequestID(id), methods.contains(method) else {
             throw LocalProductClientError.invalidRequest
         }
+        if method != "ping", expectedBuildID != nil, try await !ping() {
+            throw LocalProductClientError.unavailable
+        }
         let request = IPCRequest(
             requestID: id,
             journeyID: nil,
@@ -2773,6 +2780,9 @@ public final class LocalIPCClient:
               methods.contains(method) else {
             throw LocalProductClientError.invalidRequest
         }
+        if expectedBuildID != nil, try await !ping() {
+            throw LocalProductClientError.unavailable
+        }
         let body = try JSONEncoder().encode(
             IPCRequest(requestID: id, journeyID: journeyID, method: method, params: params)
         )
@@ -2804,6 +2814,9 @@ public final class LocalIPCClient:
         guard LocalIPCWire.validRequestID(id), Self.validJourneyID(journeyID),
               methods.contains(method) else {
             throw LocalProductClientError.invalidRequest
+        }
+        if expectedBuildID != nil, try await !ping() {
+            throw LocalProductClientError.unavailable
         }
         let body = try JSONSerialization.data(withJSONObject: [
             "version": 1,
@@ -3438,11 +3451,7 @@ public final class LocalIPCClient:
     }
 
     private static func isInstalledSocketPath(_ path: String) -> Bool {
-        let expected = FileManager.default.homeDirectoryForCurrentUser
-            .resolvingSymlinksInPath()
-            .standardizedFileURL
-            .appendingPathComponent("Library/Application Support/Loom/run/loomd.sock")
-            .path
+        guard let expected = try? LocalProductPaths.installed().socket.path else { return false }
         return URL(fileURLWithPath: path).standardizedFileURL.path == expected
     }
 

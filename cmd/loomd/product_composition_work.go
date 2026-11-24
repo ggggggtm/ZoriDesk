@@ -379,6 +379,7 @@ func newProductWorkRouteFactory(
 	statePath string,
 	governance *productGovernanceRouteSlot,
 	remoteConfig *productRemoteToolBrokerConfig,
+	isolatedProduct bool,
 ) func(context.Context) (productWorkRoutes, error) {
 	return func(ctx context.Context) (productWorkRoutes, error) {
 		if ctx == nil || store == nil || readModel == nil ||
@@ -590,41 +591,45 @@ func newProductWorkRouteFactory(
 		if err != nil {
 			return closeOnFailure(errProductWorkExecutionConstruction, err)
 		}
-		productionPaths, err := productWorkProductionPaths()
-		if err != nil {
-			return closeOnFailure(errProductWorkProductionConstruction, err)
-		}
-		productionCore, err := production.NewService(
-			store,
-			productionPaths,
-			func() time.Time { return time.Now().UTC() },
-			func(ctx context.Context) (bool, error) {
-				events, readErr := store.ReadAll(ctx)
-				if readErr != nil {
-					return false, readErr
-				}
-				permissionProjection, replayErr := permissions.Replay(events)
-				if replayErr != nil {
-					return false, replayErr
-				}
-				return permissionProjection.AdminLock, nil
-			},
-		)
-		if err != nil {
-			return closeOnFailure(errProductWorkProductionConstruction, err)
-		}
-		productionService, err := app.NewLocalProductionService(
-			store,
-			func() time.Time { return time.Now().UTC() },
-			func() string { return readModel.GlobalReadView().Version() },
-			productionCore,
-		)
-		if err != nil {
-			return closeOnFailure(errProductWorkProductionConstruction, err)
-		}
-		productionRoute, err := api.NewLocalProductionAPI(productionService)
-		if err != nil {
-			return closeOnFailure(errProductWorkProductionConstruction, err)
+		// The app owns its service lifecycle; legacy activation would write Loom paths.
+		var productionRoute productProductionRoute = isolatedProductProductionRoute{}
+		if !isolatedProduct {
+			productionPaths, err := productWorkProductionPaths()
+			if err != nil {
+				return closeOnFailure(errProductWorkProductionConstruction, err)
+			}
+			productionCore, err := production.NewService(
+				store,
+				productionPaths,
+				func() time.Time { return time.Now().UTC() },
+				func(ctx context.Context) (bool, error) {
+					events, readErr := store.ReadAll(ctx)
+					if readErr != nil {
+						return false, readErr
+					}
+					permissionProjection, replayErr := permissions.Replay(events)
+					if replayErr != nil {
+						return false, replayErr
+					}
+					return permissionProjection.AdminLock, nil
+				},
+			)
+			if err != nil {
+				return closeOnFailure(errProductWorkProductionConstruction, err)
+			}
+			productionService, err := app.NewLocalProductionService(
+				store,
+				func() time.Time { return time.Now().UTC() },
+				func() string { return readModel.GlobalReadView().Version() },
+				productionCore,
+			)
+			if err != nil {
+				return closeOnFailure(errProductWorkProductionConstruction, err)
+			}
+			productionRoute, err = api.NewLocalProductionAPI(productionService)
+			if err != nil {
+				return closeOnFailure(errProductWorkProductionConstruction, err)
+			}
 		}
 		return productWorkRoutes{
 			queue: queue, workers: workers, integration: integrationRoute,
@@ -641,6 +646,7 @@ func newProductWorkRouteFactoryFromCore(
 	statePath string,
 	governance *productGovernanceRouteSlot,
 	remoteConfig *productRemoteToolBrokerConfig,
+	isolatedProduct bool,
 ) func(context.Context) (productWorkRoutes, error) {
 	return func(ctx context.Context) (productWorkRoutes, error) {
 		resources, err := core.Resources()
@@ -648,10 +654,21 @@ func newProductWorkRouteFactoryFromCore(
 			return productWorkRoutes{}, err
 		}
 		return newProductWorkRouteFactory(
-			resources.store, resources.readModel, statePath, governance, remoteConfig,
+			resources.store, resources.readModel, statePath, governance, remoteConfig, isolatedProduct,
 		)(ctx)
 	}
 }
+
+// This route never constructs the legacy config writer or registers another service.
+type isolatedProductProductionRoute struct{}
+
+func (isolatedProductProductionRoute) ProductionSnapshot(context.Context, app.ProductionSnapshotRequest) (api.ProductionSnapshot, error) {
+	return api.ProductionSnapshot{}, app.ErrProductionUnavailable
+}
+func (isolatedProductProductionRoute) ProductionCommand(context.Context, app.ProductionCommandRequest) (app.ProductionCommandResult, error) {
+	return app.ProductionCommandResult{}, app.ErrProductionUnavailable
+}
+func (isolatedProductProductionRoute) Degraded(context.Context) bool { return false }
 
 func productWorkProductionPaths() (production.Paths, error) {
 	appSupport := ""

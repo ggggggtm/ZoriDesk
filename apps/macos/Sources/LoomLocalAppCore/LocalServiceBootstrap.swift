@@ -56,7 +56,7 @@ public final class SystemLocalServiceRegistration: LocalServiceRegistration {
     private let service: SMAppService
 
     public init(
-        plistName: String = "com.earendilworks.loom.local.daemon.plist"
+        plistName: String = LocalProductPaths.serviceLabel + ".plist"
     ) {
         service = SMAppService.agent(plistName: plistName)
     }

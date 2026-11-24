@@ -8,10 +8,13 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"loom-pi-rebuild/internal/app"
 	"loom-pi-rebuild/internal/credentials"
 	"loom-pi-rebuild/internal/credentials/ccswitch"
+	"loom-pi-rebuild/internal/productidentity"
 	"loom-pi-rebuild/internal/runtime/piadapter"
 )
 
@@ -99,6 +102,7 @@ func daemonBuildFailureReason(err error) string {
 }
 
 type daemonBuildConfig struct {
+	ProductID              string
 	Observer               app.LocalRuntimeObservationDaemonConfig
 	SocketPath             string
 	CodexExecutable        string
@@ -146,6 +150,7 @@ func productionDaemonBuilder(
 		config.Observer.StatePath,
 		config.SocketPath,
 		productSetupRuntimeConfig{
+			IsolatedProduct:    config.ProductID == productidentity.ProductID,
 			DisablePi:          config.Observer.DisablePi,
 			CodexExecutable:    config.CodexExecutable,
 			ClaudeExecutable:   config.ClaudeExecutable,
@@ -270,6 +275,7 @@ func run(
 	opencodeExecutable := fs.String("opencode-executable", "", "")
 	claudeExecutable := fs.String("claude-executable", "", "")
 	credentialImportSource := fs.String("credential-import-source", "", "")
+	productID := fs.String("product-id", "", "")
 	localModelPrivateRoot := fs.String("local-model-private-root", "", "")
 	localModelExecutable := fs.String("local-model-executable", "", "")
 	localModelPath := fs.String("local-model-path", "", "")
@@ -281,6 +287,16 @@ func run(
 		*interval <= 0 ||
 		*processTimeout <= 0 {
 		return writeDaemonError(stderr, exitInvalidInput, "invalid input")
+	}
+	if *productID != "" {
+		root := filepath.Dir(filepath.Dir(*statePath))
+		home := strings.TrimSuffix(root, string(filepath.Separator)+filepath.Join("Library", "Application Support", "ZoriDesk"))
+		paths, err := productidentity.ForHome(home)
+		if *productID != productidentity.ProductID || err != nil ||
+			*statePath != paths.State || *socketPath != paths.Socket ||
+			*isolationRoot != paths.Isolation || *credentialImportSource != "" {
+			return writeDaemonError(stderr, exitInvalidInput, "invalid input")
+		}
 	}
 	localModelValues := 0
 	for _, value := range []string{
@@ -314,6 +330,7 @@ func run(
 	}
 
 	config := daemonBuildConfig{
+		ProductID: *productID,
 		Observer: app.LocalRuntimeObservationDaemonConfig{
 			DisablePi:           *disablePi,
 			StatePath:           *statePath,

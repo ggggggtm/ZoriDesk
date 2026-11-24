@@ -4,6 +4,30 @@ import XCTest
 @testable import LoomLocalAppCore
 
 final class LocalIPCClientTests: XCTestCase {
+    func testProductIdentityRejectsLegacyServiceBeforeSnapshot() async throws {
+        let root = URL(fileURLWithPath: "/private/tmp")
+            .appendingPathComponent("zd-ipc-\(UUID().uuidString.prefix(8))")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false,
+                                               attributes: [.posixPermissions: 0o700])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let path = root.appendingPathComponent("loomd.sock").path
+        let server = try Self.makeListeningSocket(at: path, permissions: 0o600)
+        defer { Darwin.close(server) }
+        let diagnostics = try LocalOperationalDiagnostics(
+            directory: root.appendingPathComponent("diagnostics"), maximumBytes: 4096, now: { Date() })
+        let client = try LocalIPCClient(socketPath: path, requestID: { "fixture-request" },
+            operationalDiagnostics: diagnostics, recordsInstalledDiagnostics: false,
+            expectedBuildID: LocalProductPaths.buildID)
+        let response = Task.detached { try Self.servePingOnce(server: server, buildID: "loom-phase2a-w1") }
+        do {
+            _ = try await client.snapshot(limit: 1)
+            XCTFail("legacy service was used")
+        } catch {
+            XCTAssertEqual(error as? LocalProductClientError, .unavailable)
+        }
+        try await response.value
+    }
+
     func testConversationAttemptFailureBecomesOperationalError() {
         let incidentID = "loom-chat-11111111-1111-4111-8111-111111111111"
         let attempt = LocalProductConversationAttempt(
@@ -1029,7 +1053,7 @@ final class LocalIPCClientTests: XCTestCase {
         return descriptor
     }
 
-    private static func servePingOnce(server: Int32) throws {
+    private static func servePingOnce(server: Int32, buildID: String = "bootstrap-test") throws {
         let connection = Darwin.accept(server, nil, nil)
         guard connection >= 0 else { throw LocalProductClientError.unavailable }
         defer { Darwin.close(connection) }
@@ -1049,6 +1073,7 @@ final class LocalIPCClientTests: XCTestCase {
             JSONSerialization.jsonObject(with: body) as? [String: Any]
         )
         let requestID = try XCTUnwrap(object["request_id"] as? String)
+        XCTAssertEqual(object["method"] as? String, "ping")
         let response = try JSONSerialization.data(withJSONObject: [
             "version": 1,
             "request_id": requestID,
@@ -1056,7 +1081,7 @@ final class LocalIPCClientTests: XCTestCase {
             "result": [
                 "protocol_version": 1,
                 "available": true,
-                "build_id": "bootstrap-test",
+                "build_id": buildID,
             ],
         ])
         let framed = try LocalIPCWire.frame(

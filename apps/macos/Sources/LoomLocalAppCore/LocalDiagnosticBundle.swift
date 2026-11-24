@@ -396,11 +396,11 @@ public final class LocalDiagnosticBundleExporter: @unchecked Sendable {
         }
         let daemon = Bundle.main.bundleURL
             .appendingPathComponent("Contents/Library/Helpers/loomd")
-        let socket = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/Loom/run/loomd.sock")
+        let paths = try LocalProductPaths.installed()
+        try paths.prepareRoot()
+        let socket = paths.socket
         return try LocalDiagnosticBundleExporter(
-            diagnosticsDirectory: FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent("Library/Application Support/Loom/diagnostics"),
+            diagnosticsDirectory: paths.diagnostics,
             appExecutable: appExecutable,
             daemonExecutable: daemon,
             appVersion: Bundle.main.object(

@@ -2,7 +2,7 @@
 set -eu
 
 usage() {
-  echo "usage: build-loom-local-app.sh --output /absolute/path/Loom.app" >&2
+  echo "usage: build-loom-local-app.sh --output /absolute/path/ZoriDesk.app" >&2
   exit 2
 }
 
@@ -22,7 +22,7 @@ done
 
 [ -n "$output" ] || usage
 case "$output" in
-  /*/Loom.app) ;;
+  /*/ZoriDesk.app) ;;
   *) usage ;;
 esac
 [ "$output" = "${output%/}" ] || usage
@@ -33,8 +33,15 @@ esac
 
 effective_uid=$(/usr/bin/id -u)
 output_parent=$(/usr/bin/dirname "$output")
+case "$output_parent/" in
+  *.[aA][pP][pP]/*) echo "output must not be inside an application bundle" >&2; exit 3 ;;
+esac
 [ -d "$output_parent" ] && [ ! -L "$output_parent" ] || {
   echo "invalid output parent" >&2
+  exit 3
+}
+[ "$(CDPATH= cd -- "$output_parent" && pwd -P)" = "$output_parent" ] || {
+  echo "non-canonical output parent" >&2
   exit 3
 }
 [ "$(/usr/bin/stat -f '%u' "$output_parent")" = "$effective_uid" ] || {
@@ -50,7 +57,7 @@ parent_mode=$(/usr/bin/stat -f '%Lp' "$output_parent")
 repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 package_root="$repo_root/apps/macos"
 plist_source="$package_root/Resources/Info.plist"
-agent_plist_source="$package_root/Resources/com.earendilworks.loom.local.daemon.plist"
+agent_plist_source="$package_root/Resources/io.github.ggggggtm.zoridesk.local.daemon.plist"
 
 for daemon_source in "$repo_root"/cmd/loomd/*.go
 do
@@ -146,7 +153,7 @@ do
   fi
 done
 
-temporary="$output_parent/.Loom.app.new.$$"
+temporary="$output_parent/.ZoriDesk.app.new.$$"
 [ ! -e "$temporary" ] && [ ! -L "$temporary" ] || {
   echo "temporary output collision" >&2
   exit 3
@@ -171,10 +178,10 @@ trap cleanup EXIT HUP INT TERM
 /bin/cp "$executable_source" "$temporary/Contents/MacOS/LoomLocalApp"
 /bin/cp \
   "$agent_plist_source" \
-  "$temporary/Contents/Library/LaunchAgents/com.earendilworks.loom.local.daemon.plist"
+  "$temporary/Contents/Library/LaunchAgents/io.github.ggggggtm.zoridesk.local.daemon.plist"
 /usr/libexec/PlistBuddy \
   -c "Set :EnvironmentVariables:PATH $service_path" \
-  "$temporary/Contents/Library/LaunchAgents/com.earendilworks.loom.local.daemon.plist"
+  "$temporary/Contents/Library/LaunchAgents/io.github.ggggggtm.zoridesk.local.daemon.plist"
 (
   cd "$repo_root"
   CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 \
@@ -190,7 +197,7 @@ trap cleanup EXIT HUP INT TERM
 /bin/chmod 700 "$temporary/Contents/MacOS/LoomLocalApp"
 /bin/chmod 700 "$temporary/Contents/Library/Helpers/loomd"
 /bin/chmod 600 \
-  "$temporary/Contents/Library/LaunchAgents/com.earendilworks.loom.local.daemon.plist"
+  "$temporary/Contents/Library/LaunchAgents/io.github.ggggggtm.zoridesk.local.daemon.plist"
 
 /usr/bin/codesign \
   --force \
@@ -220,7 +227,7 @@ test "$(
   /usr/libexec/PlistBuddy \
     -c 'Print :CFBundleIdentifier' \
     "$temporary/Contents/Info.plist"
-)" = com.earendilworks.loom.local
+)" = io.github.ggggggtm.zoridesk.local
 /usr/bin/lipo -archs "$temporary/Contents/MacOS/LoomLocalApp" |
   /usr/bin/grep -Eq '(^| )arm64( |$)'
 /usr/bin/codesign --verify --deep --strict "$temporary"

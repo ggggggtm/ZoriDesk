@@ -43,6 +43,7 @@ import (
 	"loom-pi-rebuild/internal/localipc"
 	"loom-pi-rebuild/internal/mode"
 	"loom-pi-rebuild/internal/observability"
+	"loom-pi-rebuild/internal/productidentity"
 	"loom-pi-rebuild/internal/production"
 	"loom-pi-rebuild/internal/projection"
 	"loom-pi-rebuild/internal/provider"
@@ -673,6 +674,7 @@ type controlledMissionFixtureManifest struct {
 }
 
 type productSetupRuntimeConfig struct {
+	IsolatedProduct              bool
 	DisablePi                    bool
 	CodexExecutable              string
 	ClaudeExecutable             string
@@ -2321,7 +2323,7 @@ func newProductDaemonRunnerWithPreparedDecisions(
 		remoteToolBroker = setupConfig.Execution.RemoteToolBroker
 	}
 	workRouteFactory := newProductWorkRouteFactoryFromCore(
-		coreRouteSlot, statePath, governanceRouteSlot, remoteToolBroker,
+		coreRouteSlot, statePath, governanceRouteSlot, remoteToolBroker, setupConfig.IsolatedProduct,
 	)
 	var missionExecutionRoute productMissionExecutionRoute
 	var agentRecoveryRoute productAgentAttemptRecoveryRoute
@@ -2439,10 +2441,14 @@ func newProductDaemonRunnerWithPreparedDecisions(
 			"build_ipc", composition.ErrCompositionNotReady,
 		)
 	}
+	buildID := localProductBuildID
+	if setupConfig.IsolatedProduct {
+		buildID = productidentity.BuildID
+	}
 	server, err := localipc.NewServer(localipc.ServerConfig{
 		SocketPath:   socketPath,
 		EffectiveUID: os.Geteuid(),
-		BuildID:      localProductBuildID,
+		BuildID:      buildID,
 		Handler:      productHandler,
 	})
 	if err != nil {

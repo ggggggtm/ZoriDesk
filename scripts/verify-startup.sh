@@ -18,9 +18,11 @@ cd "$repo_root"
 export GOTOOLCHAIN=local GOWORK=off GOFLAGS=-mod=readonly GOPROXY=off
 go version
 
-packages=(./cmd/loomd ./internal/app ./internal/api ./internal/runtime/piadapter ./internal/runtime/discoveryscan ./internal/provider)
+packages=(./internal/productidentity ./cmd/loomd ./internal/app ./internal/api ./internal/runtime/piadapter ./internal/runtime/discoveryscan ./internal/provider)
 # Keep formatting scoped to this slice; inherited unrelated files are not rewritten.
 unformatted=$(gofmt -l \
+  internal/productidentity/paths.go internal/productidentity/paths_test.go \
+  cmd/loomd/product_identity_test.go cmd/loomd/main.go cmd/loomd/product_composition_work.go \
   cmd/loomd/local_app_service.go cmd/loomd/run.go cmd/loomd/run_test.go \
   cmd/loomd/product_daemon.go cmd/loomd/product_daemon_test.go \
   cmd/loomd/product_composition_agent_runtime.go cmd/loomd/optional_runtime_test.go \
@@ -40,7 +42,7 @@ go vet "${packages[@]}"
 
 # Fixed, reviewed fixture-only selection: no user accounts, installed tools, model
 # servers or opt-in live gates. The checker rejects skipped or empty packages.
-tests='^(TestQ11.*|TestRun.*|TestDaemonBuildFailureNestedAmbiguityFailsClosed|TestExpandLocalAppServiceArgs.*|TestOptionalCredentialImportSourceFailsClosedOnUnsafePath|TestPrepareLocalAppInvocation.*|TestParseLocalAppServiceInvocation.*|TestMissionExecutionConfigFromDaemonBuild.*|TestLocalRuntimeObservationDaemon.*|TestNextRuntimeObservationSequence|TestPiLocalRuntimeProbeFactory.*|TestPiMetadataProcessRunnerSuccessIsolationAndCleanup|TestPiMetadataProcessRunnerMaterializesBoundLocalCatalog|TestDiscoverConfiguredRuntimes.*|TestProductSetupRemainsAvailableWhenNoRuntimeCanBuildATeam|TestProductDaemonColdStartAdmitsAllNativeProviderRuntimes|TestContainableProductObserverTimeoutRejectsMixedFailureChains|TestProductDaemonContainsExactPiMetadataTimeoutWithoutStoppingIPC|TestObserverFailureReasonIsClosedTypedAndNonDisclosing|TestOpenAICompatibleConversation.*|TestDeepSeekConversation.*|TestDeepSeekReasoning.*|TestMiniMaxConversation.*|TestAnthropicConversation.*|TestConversationProfileRouterExcludesCredentialEchoFromPersistedDiagnostics|TestConversationProfileRouterPreservesSafeProviderHTTPFailure|TestConversationProfileRouterShowsBrandedInvalidResponse|TestProductOperationalDiagnosticsUsesConversationAttemptTerminalFailure)$'
+tests='^(TestCOMP2C(Work|Core|ProductionBuilderDoesNotConstruct|Vault|LaterBundle|ProductionDoesNotConstructVault|LegacyCredential).*|TestZoriDesk.*|TestPaths.*|TestQ11.*|TestRun.*|TestDaemonBuildFailureNestedAmbiguityFailsClosed|TestExpandLocalAppServiceArgs.*|TestOptionalCredentialImportSourceFailsClosedOnUnsafePath|TestPrepareLocalAppInvocation.*|TestParseLocalAppServiceInvocation.*|TestMissionExecutionConfigFromDaemonBuild.*|TestLocalRuntimeObservationDaemon.*|TestNextRuntimeObservationSequence|TestPiLocalRuntimeProbeFactory.*|TestPiMetadataProcessRunnerSuccessIsolationAndCleanup|TestPiMetadataProcessRunnerMaterializesBoundLocalCatalog|TestDiscoverConfiguredRuntimes.*|TestProductSetupRemainsAvailableWhenNoRuntimeCanBuildATeam|TestProductDaemonColdStartAdmitsAllNativeProviderRuntimes|TestContainableProductObserverTimeoutRejectsMixedFailureChains|TestProductDaemonContainsExactPiMetadataTimeoutWithoutStoppingIPC|TestObserverFailureReasonIsClosedTypedAndNonDisclosing|TestOpenAICompatibleConversation.*|TestDeepSeekConversation.*|TestDeepSeekReasoning.*|TestMiniMaxConversation.*|TestAnthropicConversation.*|TestConversationProfileRouterExcludesCredentialEchoFromPersistedDiagnostics|TestConversationProfileRouterPreservesSafeProviderHTTPFailure|TestConversationProfileRouterShowsBrandedInvalidResponse|TestProductOperationalDiagnosticsUsesConversationAttemptTerminalFailure)$'
 report=$(mktemp "${TMPDIR:-/tmp}/zoridesk-startup-tests.XXXXXX")
 trap 'rm -f -- "$report"' EXIT
 trap 'exit 130' INT
@@ -48,6 +50,7 @@ trap 'exit 143' TERM
 go test ${race_args[@]+"${race_args[@]}"} -json -run "$tests" -count=1 -timeout=180s "${packages[@]}" | tee "$report"
 module=$(go list -m)
 go run ./internal/testreport \
+  "$module/internal/productidentity" \
   "$module/cmd/loomd" "$module/internal/app" "$module/internal/api" \
   "$module/internal/runtime/piadapter" "$module/internal/runtime/discoveryscan" \
   "$module/internal/provider" < "$report"

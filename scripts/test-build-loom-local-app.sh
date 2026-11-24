@@ -13,6 +13,7 @@ test "$(grep -c -- '-Xlinker -reproducible' "$builder")" = 2
 grep -Eq '^for dependency in node codex opencode claude$' "$builder"
 
 private_root=$(mktemp -d "${TMPDIR:-/tmp}/loom-native-build.XXXXXX")
+private_root=$(CDPATH= cd -- "$private_root" && pwd -P)
 chmod 700 "$private_root"
 smoke_pid=
 cleanup() {
@@ -63,8 +64,8 @@ assert_no_new_crash_report() {
   fi
 }
 
-first="$private_root/first/Loom.app"
-second="$private_root/second/Loom.app"
+first="$private_root/first/ZoriDesk.app"
+second="$private_root/second/ZoriDesk.app"
 mkdir -m 700 "$private_root/first" "$private_root/second"
 red_crash_inventory="$private_root/red-crash-reports-before"
 record_crash_inventory "$red_crash_inventory"
@@ -83,7 +84,7 @@ printf '%s\n' 'let forbidden = Process()' \
   >"$shadow/apps/macos/Sources/LoomLocalApp/Forbidden.swift"
 chmod 600 "$shadow/apps/macos/Sources/LoomLocalApp/Forbidden.swift"
 if "$shadow/scripts/build-loom-local-app.sh" \
-  --output "$shadow/Loom.app" \
+  --output "$shadow/ZoriDesk.app" \
   >"$private_root/forbidden-build-output" 2>&1
 then
   echo "builder accepted forbidden native source" >&2
@@ -112,9 +113,9 @@ do
   test "$(stat -f '%Lp' "$bundle")" = 700
   test "$(stat -f '%Lp' "$bundle/Contents/MacOS/LoomLocalApp")" = 700
   test "$(stat -f '%Lp' "$bundle/Contents/Library/Helpers/loomd")" = 700
-  test "$(stat -f '%Lp' "$bundle/Contents/Library/LaunchAgents/com.earendilworks.loom.local.daemon.plist")" = 600
+  test "$(stat -f '%Lp' "$bundle/Contents/Library/LaunchAgents/io.github.ggggggtm.zoridesk.local.daemon.plist")" = 600
   test "$(stat -f '%Lp' "$bundle/Contents/Info.plist")" = 600
-  test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$bundle/Contents/Info.plist")" = com.earendilworks.loom.local
+  test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$bundle/Contents/Info.plist")" = io.github.ggggggtm.zoridesk.local
   test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleName' "$bundle/Contents/Info.plist")" = ZoriDesk
   test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$bundle/Contents/Info.plist")" = ZoriDesk
   /usr/bin/codesign --verify --strict "$bundle"
@@ -122,9 +123,9 @@ do
     grep -Eq '(^| )arm64( |$)'
   /usr/bin/lipo -archs "$bundle/Contents/Library/Helpers/loomd" |
     grep -Eq '(^| )arm64( |$)'
-  test "$(/usr/libexec/PlistBuddy -c 'Print :Label' "$bundle/Contents/Library/LaunchAgents/com.earendilworks.loom.local.daemon.plist")" = com.earendilworks.loom.local.daemon
-  test "$(/usr/libexec/PlistBuddy -c 'Print :BundleProgram' "$bundle/Contents/Library/LaunchAgents/com.earendilworks.loom.local.daemon.plist")" = Contents/Library/Helpers/loomd
-  test "$(/usr/libexec/PlistBuddy -c 'Print :ProgramArguments:1' "$bundle/Contents/Library/LaunchAgents/com.earendilworks.loom.local.daemon.plist")" = --local-app-service
+  test "$(/usr/libexec/PlistBuddy -c 'Print :Label' "$bundle/Contents/Library/LaunchAgents/io.github.ggggggtm.zoridesk.local.daemon.plist")" = io.github.ggggggtm.zoridesk.local.daemon
+  test "$(/usr/libexec/PlistBuddy -c 'Print :BundleProgram' "$bundle/Contents/Library/LaunchAgents/io.github.ggggggtm.zoridesk.local.daemon.plist")" = Contents/Library/Helpers/loomd
+  test "$(/usr/libexec/PlistBuddy -c 'Print :ProgramArguments:1' "$bundle/Contents/Library/LaunchAgents/io.github.ggggggtm.zoridesk.local.daemon.plist")" = --zoridesk-app-service
   uuid_output=$(
     /usr/bin/dwarfdump --uuid "$bundle/Contents/MacOS/LoomLocalApp"
   )
